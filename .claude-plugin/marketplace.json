@@ -1,0 +1,30 @@
+{
+  "name": "agent-workflow",
+  "interface": {
+    "displayName": "Agent Workflow Plugins"
+  },
+  "owner": {
+    "name": "sergkhl",
+    "url": "https://github.com/sergkhl"
+  },
+  "description": "Reusable agent workflow plugins maintained by sergkhl.",
+  "plugins": [
+    {
+      "name": "agent-workflow-core",
+      "source": "./plugins/agent-workflow-core",
+      "description": "A plan-driven, repository-neutral workflow for design, planning, documentation, and execution.",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools",
+      "keywords": [
+        "planning",
+        "adr",
+        "documentation",
+        "grilling",
+        "workflow"
+      ]
+    }
+  ]
+}
