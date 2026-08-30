@@ -11,9 +11,8 @@ import { dirname, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 import {
-  EXPLICIT_ONLY,
-  INITIAL_SKILLS,
   PLUGIN_ID,
+  RELEASE_INVENTORY,
   computeContentDigest,
   readAgentPolicy,
   parseFrontmatter,
@@ -46,11 +45,12 @@ test('the catalog, marketplaces, manifests, inventory, gates, and licenses satis
     pluginId: PLUGIN_ID,
     releaseTag,
   })
-  if (snapshot.version === '0.1.0') assert.deepEqual(snapshot.skills, INITIAL_SKILLS)
+  const inventory = RELEASE_INVENTORY[snapshot.version]
+  if (inventory) assert.deepEqual(snapshot.skills, inventory.skills)
   assert.match(snapshot.digest, /^sha256:[0-9a-f]{64}$/)
 })
 
-test('the seven explicit-only skills carry both harness gates and only those skills do', () => {
+test('every explicit-only skill carries both harness gates and only those skills do', () => {
   const gated = []
   const snapshot = validateCatalog(repositoryRoot, { pluginId: PLUGIN_ID, releaseTag })
   for (const name of snapshot.skills) {
@@ -61,7 +61,8 @@ test('the seven explicit-only skills carry both harness gates and only those ski
     assert.equal(claudeGate, codexGate, `${name}: invocation gates disagree`)
     if (claudeGate) gated.push(name)
   }
-  if (snapshot.version === '0.1.0') assert.deepEqual(gated, EXPLICIT_ONLY)
+  const inventory = RELEASE_INVENTORY[snapshot.version]
+  if (inventory) assert.deepEqual(gated, inventory.explicitOnly)
 })
 
 test('catalog discovery uses only relative, resolving symlinks with the documented targets', () => {

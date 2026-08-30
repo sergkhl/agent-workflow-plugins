@@ -22,10 +22,10 @@ import { relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test, { after, before } from 'node:test'
 import {
-  INITIAL_RELEASE_TAG,
-  INITIAL_SKILLS,
   PLUGIN_ID,
   computeContentDigest,
+  currentRelease,
+  listSkillDirectories,
 } from '../lib/catalog-contract.mjs'
 import {
   defaultSymlinkProbe,
@@ -34,6 +34,12 @@ import {
 } from '../install-repository.mjs'
 
 const catalogWorkingTree = resolve(import.meta.dirname, '..', '..')
+// The base fixture is the working tree itself, so its tag has to track the real manifest version.
+const { releaseTag: BASE_RELEASE_TAG } = currentRelease(catalogWorkingTree)
+const BASE_SKILLS = listSkillDirectories(resolve(catalogWorkingTree, 'plugins', PLUGIN_ID, 'skills'))
+// The upgrade fixture must use a version no release pins, since it swaps a real skill for a stub.
+const UPGRADE_VERSION = '99.0.0'
+const UPGRADE_RELEASE_TAG = `${PLUGIN_ID}--v${UPGRADE_VERSION}`
 let scratchRoot
 let baseCatalog
 let upgradeCatalog
@@ -71,7 +77,7 @@ function writeJson(path, value) {
 function makeBaseCatalog() {
   const root = resolve(scratchRoot, 'base-catalog')
   copyWorkingCatalog(root)
-  initializeGitRepository(root, { tag: INITIAL_RELEASE_TAG })
+  initializeGitRepository(root, { tag: BASE_RELEASE_TAG })
   return root
 }
 
@@ -83,8 +89,8 @@ function makeUpgradeCatalog() {
   const claudePath = resolve(plugin, '.claude-plugin', 'plugin.json')
   const codex = JSON.parse(readFileSync(codexPath, 'utf8'))
   const claude = JSON.parse(readFileSync(claudePath, 'utf8'))
-  codex.version = '0.2.0'
-  claude.version = '0.2.0'
+  codex.version = UPGRADE_VERSION
+  claude.version = UPGRADE_VERSION
   claude.skills = claude.skills
     .filter((entry) => entry !== './skills/wait-what')
     .concat('./skills/future-skill')
@@ -108,7 +114,7 @@ function makeUpgradeCatalog() {
   unlinkSync(resolve(root, '.agents', 'skills', 'wait-what'))
   symlinkSync(`../../plugins/${PLUGIN_ID}/skills/future-skill`,
     resolve(root, '.agents', 'skills', 'future-skill'), 'dir')
-  initializeGitRepository(root, { tag: `${PLUGIN_ID}--v0.2.0` })
+  initializeGitRepository(root, { tag: UPGRADE_RELEASE_TAG })
   return root
 }
 
@@ -131,7 +137,7 @@ function installBase(repositoryRoot, extra = {}, dependencies = {}) {
   return installRepository({
     repositoryRoot,
     pluginId: PLUGIN_ID,
-    releaseTag: INITIAL_RELEASE_TAG,
+    releaseTag: BASE_RELEASE_TAG,
     source: baseCatalog,
     operation: 'install',
     apply: true,
@@ -185,13 +191,13 @@ test('clean installation creates one vendor tree, exact repository links, and a 
   assert.equal(result.applied, true)
   assert.ok(lstatSync(resolve(consumer, '.agents', 'skills')).isDirectory())
   assert.equal(lstatSync(resolve(consumer, '.agents', 'skills')).isSymbolicLink(), false)
-  for (const name of INITIAL_SKILLS) assertManagedLink(consumer, name)
+  for (const name of BASE_SKILLS) assertManagedLink(consumer, name)
   assert.equal(readlinkSync(resolve(consumer, '.claude', 'skills')), '../.agents/skills')
 
   const installed = verifyInstalledRepository(consumer)
-  assert.equal(installed.lock.releaseTag, INITIAL_RELEASE_TAG)
+  assert.equal(installed.lock.releaseTag, BASE_RELEASE_TAG)
   assert.equal(installed.lock.contentDigest, computeContentDigest(installed.paths.vendor))
-  assert.equal(installed.lock.managedSymlinks.length, INITIAL_SKILLS.length + 1)
+  assert.equal(installed.lock.managedSymlinks.length, BASE_SKILLS.length + 1)
 
   const moved = `${consumer}-moved`
   renameSync(consumer, moved)
@@ -231,7 +237,7 @@ test('pre-existing exact links are adopted after their single vendor authority i
   const consumer = makeConsumer('adopt-links')
   mkdirSync(resolve(consumer, '.agents', 'skills'), { recursive: true })
   mkdirSync(resolve(consumer, '.claude'), { recursive: true })
-  for (const name of INITIAL_SKILLS) {
+  for (const name of BASE_SKILLS) {
     symlinkSync(`../plugins/${PLUGIN_ID}/skills/${name}`,
       resolve(consumer, '.agents', 'skills', name), 'dir')
   }
@@ -284,7 +290,7 @@ test('update adds and removes managed links while preserving real project skills
   const result = installRepository({
     repositoryRoot: consumer,
     pluginId: PLUGIN_ID,
-    releaseTag: `${PLUGIN_ID}--v0.2.0`,
+    releaseTag: UPGRADE_RELEASE_TAG,
     source: upgradeCatalog,
     operation: 'update',
     apply: true,
@@ -294,8 +300,8 @@ test('update adds and removes managed links while preserving real project skills
   assertManagedLink(consumer, 'future-skill')
   assert.ok(lstatSync(projectSkill).isDirectory())
   const installed = verifyInstalledRepository(consumer)
-  assert.equal(installed.lock.pluginVersion, '0.2.0')
-  assert.equal(installed.lock.releaseTag, `${PLUGIN_ID}--v0.2.0`)
+  assert.equal(installed.lock.pluginVersion, UPGRADE_VERSION)
+  assert.equal(installed.lock.releaseTag, UPGRADE_RELEASE_TAG)
 })
 
 test('update refuses a modified managed link and preserves the complete consumer tree', () => {
@@ -308,7 +314,7 @@ test('update refuses a modified managed link and preserves the complete consumer
   assert.throws(() => installRepository({
     repositoryRoot: consumer,
     pluginId: PLUGIN_ID,
-    releaseTag: `${PLUGIN_ID}--v0.2.0`,
+    releaseTag: UPGRADE_RELEASE_TAG,
     source: upgradeCatalog,
     operation: 'update',
     apply: true,
@@ -344,7 +350,7 @@ test('safe uninstall removes only locked links and pristine vendor content', () 
   assert.equal(existsSync(resolve(consumer, '.agents', 'plugins', PLUGIN_ID)), false)
   assert.equal(existsSync(resolve(consumer, '.agents', 'plugins', `${PLUGIN_ID}.vendor.json`)), false)
   assert.equal(existsSync(resolve(consumer, '.claude', 'skills')), false)
-  for (const name of INITIAL_SKILLS) assert.equal(existsSync(resolve(consumer, '.agents', 'skills', name)), false)
+  for (const name of BASE_SKILLS) assert.equal(existsSync(resolve(consumer, '.agents', 'skills', name)), false)
   assert.ok(lstatSync(projectSkill).isDirectory())
   assert.ok(lstatSync(resolve(consumer, '.agents', 'skills')).isDirectory())
   assert.ok(lstatSync(resolve(consumer, '.agents')).isDirectory())

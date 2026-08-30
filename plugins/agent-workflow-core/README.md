@@ -15,6 +15,7 @@ points to each stage.
 | `plan-lifecycle` | model | Defines the plan index, `TODO`/`RELEASE`/`BLOCKERS`, ownership rules, closure test, and Validation Log retention. |
 | `plan-from-tasks` | explicit | Turns a task list into a new plan after answering what it can from the repository and grilling the remaining decisions. |
 | `drain-plans` | explicit | Repeats batch, validation, status persistence, commit, and re-read until nothing is actionable. |
+| `parallel-lanes` | explicit | Defines the claim, write-ownership, and integration rules for running one plan's units in more than one lane. |
 | `docs-hygiene` | explicit | Enforces one canonical definition per concept and Keep/Simplify/Merge/Defer/Remove traceability. |
 | `worklog` | explicit | Estimates hands-on effort per day from commit authorship and emits a CSV. |
 | `grilling` | model | Runs a relentless interview over a design tree, one frontier of questions per round. |
@@ -24,17 +25,18 @@ points to each stage.
 | `improve-codebase-architecture` | explicit | Finds deepening opportunities, reports them, then grills the selected one. |
 | `wait-what` | explicit | Re-pitches an explanation that did not land. |
 
-The source for all eleven skills is this one `skills/` tree. Repository installs link to it; they do
+The source for all twelve skills is this one `skills/` tree. Repository installs link to it; they do
 not make additional physical skill copies.
 
 ## Invocation policy
 
-Seven skills are explicit-only:
+Eight skills are explicit-only:
 
 - `docs-hygiene`
 - `drain-plans`
 - `grill-with-docs`
 - `improve-codebase-architecture`
+- `parallel-lanes`
 - `plan-from-tasks`
 - `wait-what`
 - `worklog`

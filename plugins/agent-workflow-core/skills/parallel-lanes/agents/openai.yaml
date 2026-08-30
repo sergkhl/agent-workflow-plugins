@@ -1,0 +1,6 @@
+interface:
+  display_name: "Parallel Lanes"
+  short_description: "Run one plan's units in more than one lane"
+  default_prompt: "Use $parallel-lanes to run the units of this plan in more than one lane."
+policy:
+  allow_implicit_invocation: false

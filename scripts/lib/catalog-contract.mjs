@@ -15,32 +15,62 @@ export const CATALOG_REPOSITORY_URL = 'https://github.com/sergkhl/agent-workflow
 export const MARKETPLACE_ID = 'agent-workflow'
 export const MARKETPLACE_DISPLAY_NAME = 'Agent Workflow Plugins'
 export const PLUGIN_ID = 'agent-workflow-core'
-export const INITIAL_VERSION = '0.1.0'
-export const INITIAL_RELEASE_TAG = `${PLUGIN_ID}--v${INITIAL_VERSION}`
-
-export const INITIAL_SKILLS = [
-  'codebase-design',
-  'docs-hygiene',
-  'domain-modeling',
-  'drain-plans',
-  'grill-with-docs',
-  'grilling',
-  'improve-codebase-architecture',
-  'plan-from-tasks',
-  'plan-lifecycle',
-  'wait-what',
-  'worklog',
-]
-
-export const EXPLICIT_ONLY = [
-  'docs-hygiene',
-  'drain-plans',
-  'grill-with-docs',
-  'improve-codebase-architecture',
-  'plan-from-tasks',
-  'wait-what',
-  'worklog',
-]
+// Each released version pins the exact skills it shipped and which of them are explicit-only, so a
+// later edit cannot quietly add a skill or drop an invocation gate. A version with no entry here —
+// an unreleased working version, or a test fixture — is simply unpinned; every other assertion in
+// validateCatalog, including Claude/Codex gate agreement, still applies to it.
+export const RELEASE_INVENTORY = {
+  '0.1.0': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'wait-what',
+      'worklog',
+    ],
+  },
+  '0.2.0': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'parallel-lanes',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'parallel-lanes',
+      'plan-from-tasks',
+      'wait-what',
+      'worklog',
+    ],
+  },
+}
 
 export function readJson(path) {
   try {
@@ -48,6 +78,11 @@ export function readJson(path) {
   } catch (error) {
     throw new Error(`Cannot read valid JSON from ${path}: ${error.message}`)
   }
+}
+
+export function currentRelease(catalogRoot, pluginId = PLUGIN_ID) {
+  const manifest = readJson(resolve(catalogRoot, 'plugins', pluginId, '.codex-plugin', 'plugin.json'))
+  return { version: manifest.version, releaseTag: `${pluginId}--v${manifest.version}` }
 }
 
 export function listSkillDirectories(skillsDirectory) {
@@ -185,8 +220,10 @@ export function validateCatalog(catalogRoot, { pluginId = PLUGIN_ID, releaseTag 
     return entry.slice('./skills/'.length)
   }).sort()
   assertDeepEqual(claudeSkills, skillDirectories, 'Claude manifest does not expose every plugin skill')
-  if (codex.version === INITIAL_VERSION) {
-    assertDeepEqual(skillDirectories, INITIAL_SKILLS, 'Version 0.1.0 must contain the canonical 11 skills')
+  const inventory = RELEASE_INVENTORY[codex.version]
+  if (inventory) {
+    assertDeepEqual(skillDirectories, inventory.skills,
+      `Version ${codex.version} skill inventory changed`)
   }
 
   const gated = []
@@ -206,8 +243,9 @@ export function validateCatalog(catalogRoot, { pluginId = PLUGIN_ID, releaseTag 
       }
     }
   }
-  if (codex.version === INITIAL_VERSION) {
-    assertDeepEqual(gated.sort(), EXPLICIT_ONLY, 'Version 0.1.0 explicit-only inventory changed')
+  if (inventory) {
+    assertDeepEqual(gated.sort(), inventory.explicitOnly,
+      `Version ${codex.version} explicit-only inventory changed`)
   }
 
   for (const prompt of interfaceMetadata.defaultPrompt) {
