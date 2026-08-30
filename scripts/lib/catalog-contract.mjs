@@ -70,6 +70,32 @@ export const RELEASE_INVENTORY = {
       'worklog',
     ],
   },
+  // 0.3.0 withdraws parallel-lanes: a lane protocol needs a claim registry and isolated working
+  // copies, which are repository mechanics. Consuming repositories own and gate their own.
+  '0.3.0': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'wait-what',
+      'worklog',
+    ],
+  },
 }
 
 export function readJson(path) {
