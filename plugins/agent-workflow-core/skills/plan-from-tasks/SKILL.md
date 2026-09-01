@@ -74,4 +74,5 @@ only the owner can clear goes to `BLOCKERS.md` now, not later.
 ## 5. Stop
 
 Confirm the shared understanding is reached and the plan is committed. Implementation is a separate
-invocation — [`drain-plans`](../drain-plans/SKILL.md), or the repository's own worktree lane skill.
+invocation — [`drain-plans`](../drain-plans/SKILL.md), or whatever implementation workflow the
+repository owns.

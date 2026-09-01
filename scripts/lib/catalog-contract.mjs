@@ -96,6 +96,32 @@ export const RELEASE_INVENTORY = {
       'worklog',
     ],
   },
+  // 0.3.1 is 0.3.0's inventory unchanged. It removes the last references to the withdrawn lane
+  // vocabulary from prose, so no skill, gate, or interface moved.
+  '0.3.1': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'wait-what',
+      'worklog',
+    ],
+  },
 }
 
 export function readJson(path) {

@@ -110,11 +110,11 @@ A log that is only ever appended to becomes most of its plan.
 
 ## Parallel work
 
-Implementation units are **sequential and exclusive**: one lane, one unit at a time, in the order the
-plan states. Running more than one lane over a plan is a separate workflow that a repository owns and
-gates behind explicit invocation. This plugin does not ship one — a claim registry and isolated
-working copies are repository mechanics, not portable conventions. A plan does not declare
-parallel-safety unless that workflow is running.
+Implementation units are **sequential and exclusive**: one unit at a time, in the order the plan
+states. Running several at once is a separate workflow that a repository owns and gates behind
+explicit invocation. This plugin does not ship one — recording who owns which unit, and giving each
+an isolated working copy, are repository mechanics rather than portable conventions. A plan does not
+declare parallel-safety unless that workflow is running.
 
 ## Setting this up in a new repository
 
