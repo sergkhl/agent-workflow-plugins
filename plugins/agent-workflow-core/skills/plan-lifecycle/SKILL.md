@@ -1,6 +1,7 @@
 ---
 name: plan-lifecycle
-description: The conventions every other planning skill assumes — the ordered plan index, the TODO/RELEASE/BLOCKERS triad, who may write what, the exit test that closes a plan, and Validation Log retention. Use when reading or writing anything under docs/plans/, when a plan seems finished, when status has to be recorded in more than one place, or when setting this workflow up in a repository that does not have it yet.
+description: Explicit invocation only. The conventions every other planning skill assumes — the ordered plan index, the TODO/RELEASE/BLOCKERS triad, who may write what, the exit test that closes a plan, and Validation Log retention. Use only when the current prompt names $plan-lifecycle or this skill path; never infer it from reading or writing under docs/plans/, from a plan that seems finished, or from status needing to be recorded in more than one place.
+disable-model-invocation: true
 ---
 
 # The plan lifecycle

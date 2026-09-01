@@ -1,3 +1,6 @@
 interface:
   display_name: "Plan Lifecycle"
   short_description: "How the plan index, TODO, RELEASE and BLOCKERS fit together"
+  default_prompt: "Use $plan-lifecycle: check docs/plans/ against the lifecycle conventions and tell me what is out of shape."
+policy:
+  allow_implicit_invocation: false

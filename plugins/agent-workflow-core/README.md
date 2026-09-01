@@ -12,7 +12,7 @@ points to each stage.
 
 | Skill | Invocation | What it does |
 |---|---|---|
-| `plan-lifecycle` | model | Defines the plan index, `TODO`/`RELEASE`/`BLOCKERS`, ownership rules, closure test, and Validation Log retention. |
+| `plan-lifecycle` | explicit | Defines the plan index, `TODO`/`RELEASE`/`BLOCKERS`, ownership rules, closure test, and Validation Log retention. |
 | `plan-from-tasks` | explicit | Turns a task list into a new plan after answering what it can from the repository and grilling the remaining decisions. |
 | `drain-plans` | explicit | Repeats batch, validation, status persistence, commit, and re-read until nothing is actionable. |
 | `docs-hygiene` | explicit | Enforces one canonical definition per concept and Keep/Simplify/Merge/Defer/Remove traceability. |
@@ -29,13 +29,14 @@ not make additional physical skill copies.
 
 ## Invocation policy
 
-Seven skills are explicit-only:
+Eight skills are explicit-only:
 
 - `docs-hygiene`
 - `drain-plans`
 - `grill-with-docs`
 - `improve-codebase-architecture`
 - `plan-from-tasks`
+- `plan-lifecycle`
 - `wait-what`
 - `worklog`
 
@@ -44,8 +45,8 @@ Each carries both harness gates:
 - `disable-model-invocation: true` in `SKILL.md` for Claude.
 - `policy.allow_implicit_invocation: false` in `agents/openai.yaml` for Codex.
 
-The four model-invocable skills are `codebase-design`, `domain-modeling`, `grilling`, and
-`plan-lifecycle`. A gated skill's default prompt names the skill explicitly.
+The three model-invocable skills are `codebase-design`, `domain-modeling`, and `grilling`. A gated
+skill's default prompt names the skill explicitly.
 
 ## Host repository assumptions
 

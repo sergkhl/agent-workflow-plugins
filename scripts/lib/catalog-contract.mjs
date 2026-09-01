@@ -122,6 +122,34 @@ export const RELEASE_INVENTORY = {
       'worklog',
     ],
   },
+  // 0.4.0 gates plan-lifecycle. Its description triggered on any read or write under docs/plans/,
+  // so the conventions loaded on their own during unrelated work. plan-from-tasks and drain-plans
+  // reach it by relative path rather than by invocation, so gating costs the workflow nothing.
+  '0.4.0': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'wait-what',
+      'worklog',
+    ],
+  },
 }
 
 export function readJson(path) {

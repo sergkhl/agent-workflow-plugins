@@ -16,13 +16,13 @@ checks in repository-scoped skill links for both Codex and Claude:
 .claude/skills -> ../.agents/skills        one shared Claude entry point
 ```
 
-Install release `0.3.1` from the public tag:
+Install release `0.4.0` from the public tag:
 
 ```bash
 node scripts/install-repository.mjs \
   --repo <consumer-repository-root> \
   --plugin agent-workflow-core \
-  --ref agent-workflow-core--v0.3.1 \
+  --ref agent-workflow-core--v0.4.0 \
   --apply
 ```
 
@@ -32,7 +32,7 @@ When developing the catalog locally, replace the network fetch with a clean, tag
 node scripts/install-repository.mjs \
   --repo <consumer-repository-root> \
   --plugin agent-workflow-core \
-  --ref agent-workflow-core--v0.3.1 \
+  --ref agent-workflow-core--v0.4.0 \
   --source . \
   --apply
 ```
@@ -107,8 +107,8 @@ its own marketplace plugin at the same time.
 - Marketplace ID: `agent-workflow`
 - Marketplace display name: `Agent Workflow Plugins`
 - Plugin ID: `agent-workflow-core`
-- Current version: `0.3.1`
-- Release tag: `agent-workflow-core--v0.3.1`
+- Current version: `0.4.0`
+- Release tag: `agent-workflow-core--v0.4.0`
 - Plugin path: `./plugins/agent-workflow-core`
 - Installation policy: `AVAILABLE`
 - Authentication policy: `ON_INSTALL`
