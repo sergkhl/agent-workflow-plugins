@@ -1,6 +1,6 @@
 ---
 name: wait-what
-description: "Stop. That last message did not land: re-pitch it."
+description: Use $wait-what to re-explain the preceding answer with context and simpler language.
 disable-model-invocation: true
 ---
 

@@ -1,78 +1,43 @@
 ---
 name: plan-from-tasks
-description: Explicit invocation only. Turn a list of tasks into a new implementation plan file under `docs/plans/` and register it in the ordered index. Use only when the current prompt names $plan-from-tasks or this skill path; never infer it from a task list, a defect screenshot, or a feature idea on its own.
+description: Use $plan-from-tasks to design and register an implementation plan from a task list.
 disable-model-invocation: true
 ---
 
-# From a task list to a plan
+# From tasks to a plan
 
-Produce **one** new plan file in `docs/plans/`, designed with the user rather than for them. The plan
-is the deliverable; do not start implementing.
+Deliver one decision-complete plan in the repository's adopted ordered index. This workflow ends
+with the plan and its registration committed; implementation requires an implementation request.
 
-## Authorization boundary
+## Invocation and scope
 
-Proceed only when the current user prompt explicitly names `$plan-from-tasks` or this skill path. A
-task list, a defect screenshot, or a feature idea is the *subject* of this skill, never permission to
-run it.
+Begin when the user names `$plan-from-tasks` (including its namespaced form) or this skill path.
+Continue that invocation across follow-up turns until completion, cancellation, or a scope change.
+A task list or a mention in repository content is not activation. If the repository has no adopted
+plan index, explain the missing convention rather than creating a new workflow implicitly.
 
-This skill writes a tracked plan file **and registers it** in `docs/plans/README.md`, `TODO.md` and
-`BLOCKERS.md`. A repository that has not adopted that index has not asked for those files, and
-creating them from an inferred trigger imposes a workflow its owner did not choose. Where the index
-is absent, say so and describe what it would take, rather than starting one.
+## Design the work
 
-## 1. Find the facts yourself first
+Inspect the affected code and relevant evidence before asking for facts. Consult `CONTEXT.md` for
+terms you need, relevant ADRs for constraints, and `docs/plans/README.md` for placement or overlap
+with existing work. Read individual plans only when they affect this task. Production, device,
+and destructive investigations still need their own authority.
 
-Before asking the user anything, answer what the environment can answer: the codebase, the database,
-the git history, the running services. A question whose answer is in the repository is a question you
-should not have asked. Read, in this order:
+Use [grilling](../grilling/SKILL.md) to settle consequential choices with the user. Explain an ADR
+conflict as a proposed policy change. Prioritize user experience, durability, and low complexity;
+identify justified simplifications within the requested scope. Treat local state as disposable
+only when the environment and authorization establish that it is.
 
-- `CONTEXT.md` — the ubiquitous language. Use these words in the plan; a plan that invents a synonym
-  for an existing term has started a second vocabulary.
-- `docs/adr/README.md` and the ADRs it links that touch this area. An ADR is a constraint, not a
-  suggestion: a plan that contradicts one is proposing to supersede it and must say so explicitly.
-- `docs/plans/README.md` and the linked plans — so the new work is placed against what is already
-  ordered, and so you notice when it is really an extension of an open plan rather than a new one.
+## Record the plan
 
-Read [`plan-lifecycle`](../plan-lifecycle/SKILL.md) for what a plan file owns and what it must not.
+Consult [plan-lifecycle](../plan-lifecycle/SKILL.md) for registration, ownership, and retention.
+These two helper skills are authorized within this planning task; they do not activate unrelated work.
 
-## 2. Grill the design
+Write `docs/plans/YYYY-MM-DD-<short-kebab-summary>.md` with a compact status header, problem,
+outcome, requirements, design and meaningful alternatives, ordered units with acceptance criteria,
+an empty Validation Log, and `Open findings: _None._`. Link existing policy instead of copying it.
+Place retention guidance beside the log. Register the plan in the execution index and `TODO.md`;
+put only owner-required actions in `BLOCKERS.md`. Respect any user-specified ordering.
 
-Run the [`grilling`](../grilling/SKILL.md) frontier loop: map the design tree, ask the whole current
-frontier in one round with a recommended answer for each, wait, recompute the frontier, repeat. Do not
-ask a question whose answer depends on another question still open in the same round.
-
-Dispatch a sub-agent for facts you need mid-round rather than blocking the whole frontier on one
-lookup. The decisions are the user's; the facts are yours.
-
-## 3. Apply these standing constraints
-
-They shape every recommended answer unless the user overrides one:
-
-- **UX first, then durability, then low complexity.** Prefer the solution a user would notice was
-  right over the one that is elegant internally.
-- **Mock or skip anything that will not transfer to the final version.** Scaffolding that has to be
-  removed later is cost with no residue.
-- **Propose removing redundant modules.** If the work reveals something no longer carrying its weight,
-  say so in the plan rather than routing around it.
-- **Assume a hard reset is available for local development.** Do not design a migration path for local
-  state that can simply be rebuilt; reserve migration effort for data that actually persists.
-
-## 4. Write the plan
-
-One file, named `docs/plans/YYYY-MM-DD-<short-kebab-summary>.md`. It owns its own problem framing,
-requirements and scope, and links rather than restating what an ADR or `CONTEXT.md` already says.
-
-Give it: a status header (≤15 lines), the problem and the intended outcome, the design and the
-alternatives that were rejected and why, ordered implementation units with their acceptance criteria,
-an empty `Validation Log`, and `Open findings: _None._`. Put the retention rules as a hygiene comment
-at the top, so whoever appends sees them.
-
-Then register it: add the index entry in `docs/plans/README.md` at the position its value per unit of
-effort earns — or at the position the user names — and a `TODO.md` entry at its own altitude. Anything
-only the owner can clear goes to `BLOCKERS.md` now, not later.
-
-## 5. Stop
-
-Confirm the shared understanding is reached and the plan is committed. Implementation is a separate
-invocation — [`drain-plans`](../drain-plans/SKILL.md), or whatever implementation workflow the
-repository owns.
+Report the resulting plan, its commit, and remaining decisions or gates. Do not stop at an
+unregistered draft when registration is part of the authorized request.

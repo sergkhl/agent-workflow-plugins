@@ -18,7 +18,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, relative, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import {
@@ -31,6 +31,7 @@ import {
 } from './lib/catalog-contract.mjs'
 
 const LOCK_SCHEMA_VERSION = 1
+const CATALOG_LOCK_SCHEMA_VERSION = 2
 const CLAUDE_LINK = { path: '.claude/skills', target: '../.agents/skills' }
 
 const usage = `Usage:
@@ -39,6 +40,8 @@ const usage = `Usage:
   node scripts/install-repository.mjs --repo <root> --plugin agent-workflow-core --ref <tag> [--source <catalog>] --update --apply
   node scripts/install-repository.mjs --repo <root> --plugin agent-workflow-core --uninstall --apply
 
+Add --catalog-root <repo-relative-directory> to manage resources in a catalog whose
+setup owns agent discovery links. Supported by every operation.
 Omit --apply from install, update, or uninstall to perform a read-only preflight.`
 
 function fail(message) {
@@ -154,16 +157,26 @@ function prepareCatalogSource({ source, releaseTag, pluginId }) {
   }
 }
 
-function repositoryPaths(repositoryRoot, pluginId) {
+function repositoryPaths(repositoryRoot, pluginId, catalogRoot) {
+  if (catalogRoot !== undefined) {
+    assert(typeof catalogRoot === 'string' && catalogRoot.length > 0,
+      '--catalog-root must be a nonempty repository-relative directory')
+    const parts = catalogRoot.split('/')
+    assert(parts.every((part) => /^[A-Za-z0-9_.-]+$/.test(part)
+      && !part.endsWith('.')
+      && !['.git', '.agents', '.claude'].includes(part.toLowerCase())),
+    '--catalog-root must be a safe repository-relative catalog directory')
+  }
+  const resourceRoot = catalogRoot ?? '.agents'
   return {
     repositoryRoot,
-    agents: resolve(repositoryRoot, '.agents'),
-    plugins: resolve(repositoryRoot, '.agents', 'plugins'),
-    skills: resolve(repositoryRoot, '.agents', 'skills'),
-    vendor: resolve(repositoryRoot, '.agents', 'plugins', pluginId),
-    lock: resolve(repositoryRoot, '.agents', 'plugins', `${pluginId}.vendor.json`),
-    claude: resolve(repositoryRoot, '.claude'),
-    claudeSkills: resolve(repositoryRoot, '.claude', 'skills'),
+    catalogRoot,
+    agents: resolve(repositoryRoot, resourceRoot),
+    plugins: resolve(repositoryRoot, resourceRoot, 'plugins'),
+    skills: resolve(repositoryRoot, resourceRoot, 'skills'),
+    vendor: resolve(repositoryRoot, resourceRoot, 'plugins', pluginId),
+    lock: resolve(repositoryRoot, resourceRoot, 'plugins', `${pluginId}.vendor.json`),
+    claude: catalogRoot === undefined ? resolve(repositoryRoot, '.claude') : null,
   }
 }
 
@@ -173,31 +186,35 @@ function ensureDirectoryOrMissing(path, label) {
 }
 
 function validateRepositoryAnchors(paths) {
-  ensureDirectoryOrMissing(paths.agents, '.agents')
-  ensureDirectoryOrMissing(paths.plugins, '.agents/plugins')
-  ensureDirectoryOrMissing(paths.skills, '.agents/skills')
-  ensureDirectoryOrMissing(paths.claude, '.claude')
+  // Check every ancestor, including missing ones; a symlink may not redirect a catalog write.
+  for (const target of [paths.plugins, paths.skills, paths.claude].filter(Boolean)) {
+    for (let path = target; path !== paths.repositoryRoot; path = dirname(path)) {
+      ensurePathInside(paths.repositoryRoot, path)
+      ensureDirectoryOrMissing(path, relative(paths.repositoryRoot, path))
+    }
+  }
 }
 
-function managedLinksForSkills(skills, pluginId = PLUGIN_ID) {
+function managedLinksForSkills(skills, pluginId = PLUGIN_ID, catalogRoot) {
   const links = skills.map((name) => ({
-    path: `.agents/skills/${name}`,
+    path: `${catalogRoot ?? '.agents'}/skills/${name}`,
     target: `../plugins/${pluginId}/skills/${name}`,
   }))
-  links.push(CLAUDE_LINK)
+  if (catalogRoot === undefined) links.push(CLAUDE_LINK)
   return links.sort((left, right) => left.path.localeCompare(right.path, 'en'))
 }
 
-function lockForSnapshot(snapshot) {
+function lockForSnapshot(snapshot, paths) {
   return {
-    schemaVersion: LOCK_SCHEMA_VERSION,
+    schemaVersion: paths.catalogRoot === undefined ? LOCK_SCHEMA_VERSION : CATALOG_LOCK_SCHEMA_VERSION,
+    ...(paths.catalogRoot === undefined ? {} : { layout: { type: 'catalog', root: paths.catalogRoot } }),
     repositoryUrl: CATALOG_REPOSITORY_URL,
     pluginId: snapshot.codex.name,
     releaseTag: snapshot.releaseTag,
     commitSha: snapshot.commitSha,
     pluginVersion: snapshot.version,
     contentDigest: snapshot.digest,
-    managedSymlinks: managedLinksForSkills(snapshot.skills, snapshot.codex.name),
+    managedSymlinks: managedLinksForSkills(snapshot.skills, snapshot.codex.name, paths.catalogRoot),
   }
 }
 
@@ -205,23 +222,31 @@ function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`
 }
 
-function validateManagedLinkShape(link, pluginId) {
+function validateManagedLinkShape(link, pluginId, catalogRoot) {
   assert(link && typeof link.path === 'string' && typeof link.target === 'string',
     'Every managedSymlinks entry must contain string path and target fields')
-  if (link.path === CLAUDE_LINK.path) {
+  if (catalogRoot === undefined && link.path === CLAUDE_LINK.path) {
     assert(link.target === CLAUDE_LINK.target, '.claude/skills has an unexpected lock target')
     return
   }
-  const match = /^\.agents\/skills\/([a-z0-9-]+)$/.exec(link.path)
-  assert(match, `Unsafe managed symlink path in lock: ${link.path}`)
-  assert(link.target === `../plugins/${pluginId}/skills/${match[1]}`,
+  const prefix = `${catalogRoot ?? '.agents'}/skills/`
+  const name = link.path.startsWith(prefix) ? link.path.slice(prefix.length) : ''
+  assert(/^[a-z0-9-]+$/.test(name), `Unsafe managed symlink path in lock: ${link.path}`)
+  assert(link.target === `../plugins/${pluginId}/skills/${name}`,
     `Unexpected managed symlink target in lock: ${link.path} -> ${link.target}`)
 }
 
-function validateLock(lock, pluginId) {
+function validateLock(lock, pluginId, paths) {
   assert(lock && typeof lock === 'object' && !Array.isArray(lock), 'Vendor lock must be a JSON object')
-  assert(lock.schemaVersion === LOCK_SCHEMA_VERSION,
+  assert([LOCK_SCHEMA_VERSION, CATALOG_LOCK_SCHEMA_VERSION].includes(lock.schemaVersion),
     `Unsupported vendor lock schema: ${lock.schemaVersion}`)
+  const isCatalog = lock.schemaVersion === CATALOG_LOCK_SCHEMA_VERSION
+  if (isCatalog) {
+    assert(paths.catalogRoot !== undefined && lock.layout?.type === 'catalog'
+      && lock.layout.root === paths.catalogRoot, 'Vendor lock catalog layout does not match --catalog-root')
+  } else {
+    assert(lock.layout === undefined, 'Legacy vendor lock must not declare a layout')
+  }
   assert(lock.repositoryUrl === CATALOG_REPOSITORY_URL, 'Vendor lock repository URL is not canonical')
   assert(lock.pluginId === pluginId, `Vendor lock plugin ID must be ${pluginId}`)
   assert(typeof lock.releaseTag === 'string', 'Vendor lock releaseTag is required')
@@ -231,20 +256,22 @@ function validateLock(lock, pluginId) {
   assert(/^[0-9a-f]{40}$/.test(lock.commitSha), 'Vendor lock commitSha must be an exact 40-character SHA')
   assert(/^sha256:[0-9a-f]{64}$/.test(lock.contentDigest), 'Vendor lock contentDigest must be SHA-256')
   assert(Array.isArray(lock.managedSymlinks), 'Vendor lock managedSymlinks must be an array')
-  for (const link of lock.managedSymlinks) validateManagedLinkShape(link, pluginId)
+  for (const link of lock.managedSymlinks) {
+    validateManagedLinkShape(link, pluginId, isCatalog ? paths.catalogRoot : undefined)
+  }
   const sorted = [...lock.managedSymlinks].sort((left, right) => left.path.localeCompare(right.path, 'en'))
   assert(JSON.stringify(sorted) === JSON.stringify(lock.managedSymlinks),
     'Vendor lock managedSymlinks must be deterministic and sorted')
   assert(new Set(lock.managedSymlinks.map((link) => link.path)).size === lock.managedSymlinks.length,
     'Vendor lock contains duplicate managed symlink paths')
-  assert(lock.managedSymlinks.some((link) => link.path === CLAUDE_LINK.path),
+  assert(isCatalog || lock.managedSymlinks.some((link) => link.path === CLAUDE_LINK.path),
     'Vendor lock must manage .claude/skills')
   return lock
 }
 
 function readVendorLock(paths, pluginId) {
   assert(pathType(paths.lock) === 'file', `Missing vendor lock: ${paths.lock}`)
-  return validateLock(readJson(paths.lock), pluginId)
+  return validateLock(readJson(paths.lock), pluginId, paths)
 }
 
 function assertExactSymlink(repositoryRoot, link, { mustResolve = false } = {}) {
@@ -291,6 +318,7 @@ function atomicWriteJson(path, value) {
 
 function makeDirectory(path, createdDirectories) {
   if (pathType(path) === 'directory') return
+  if (pathType(dirname(path)) === 'missing') makeDirectory(dirname(path), createdDirectories)
   mkdirSync(path)
   createdDirectories.push(path)
 }
@@ -331,16 +359,19 @@ function pluginManifestsAt(vendor) {
   }
 }
 
-export function verifyInstalledRepository(repositoryRootInput, pluginId = PLUGIN_ID) {
+export function verifyInstalledRepository(repositoryRootInput, pluginId = PLUGIN_ID, { catalogRoot } = {}) {
   const repositoryRoot = validateGitRoot(repositoryRootInput, 'Consumer repository')
-  const paths = repositoryPaths(repositoryRoot, pluginId)
+  const paths = repositoryPaths(repositoryRoot, pluginId, catalogRoot)
   validateRepositoryAnchors(paths)
-  assert(pathType(paths.skills) === 'directory', '.agents/skills must be a real directory')
+  assert(pathType(paths.skills) === 'directory', 'Skill root must be a real directory')
   assert(pathType(paths.vendor) === 'directory', `Missing vendored plugin: ${paths.vendor}`)
   const lock = readVendorLock(paths, pluginId)
-  for (const link of lock.managedSymlinks) {
-    assertExactSymlink(repositoryRoot, link, { mustResolve: true })
-  }
+  const legacyCatalog = catalogRoot !== undefined && lock.schemaVersion === LOCK_SCHEMA_VERSION
+  const managedLinks = legacyCatalog
+    ? lock.managedSymlinks.filter((link) => link.path !== CLAUDE_LINK.path)
+      .map((link) => ({ ...link, path: link.path.replace(/^\.agents\//, `${catalogRoot}/`) }))
+    : lock.managedSymlinks
+  for (const link of managedLinks) assertExactSymlink(repositoryRoot, link, { mustResolve: true })
   const actualDigest = computeContentDigest(paths.vendor)
   assert(actualDigest === lock.contentDigest,
     `Vendored plugin has local modifications: ${actualDigest} does not match ${lock.contentDigest}`)
@@ -355,30 +386,41 @@ export function verifyInstalledRepository(repositoryRootInput, pluginId = PLUGIN
   assert(manifests.codex.skills === './skills/', 'Vendored Codex manifest must discover ./skills/')
 
   const skills = listSkillDirectories(resolve(paths.vendor, 'skills'))
-  const expectedLinks = managedLinksForSkills(skills, pluginId)
+  assert(Array.isArray(manifests.claude.skills)
+    && JSON.stringify([...manifests.claude.skills].sort())
+      === JSON.stringify(skills.map((name) => `./skills/${name}`).sort()),
+  'Vendored Claude manifest skill inventory does not match the installed skills')
+  const expectedLinks = managedLinksForSkills(skills, pluginId, legacyCatalog ? undefined : catalogRoot)
   assert(JSON.stringify(expectedLinks) === JSON.stringify(lock.managedSymlinks),
     'Vendor lock managed-link inventory does not match the vendored skill inventory')
 
-  return { repositoryRoot, paths, lock, manifests, skills, digest: actualDigest }
+  // Legacy catalog snapshots recorded generated discovery paths. Verify the actual catalog
+  // links instead, then migrate only through --update --apply. Never touch preset-owned links.
+  return { repositoryRoot, paths, lock, managedLinks, legacyCatalog, manifests, skills, digest: actualDigest }
 }
 
 function stagePlugin(snapshot, paths) {
   const stage = resolve(paths.plugins, `.${snapshot.codex.name}.stage-${randomUUID()}`)
   ensurePathInside(paths.repositoryRoot, stage)
-  cpSync(snapshot.pluginRoot, stage, { recursive: true, dereference: false, errorOnExist: true })
-  assert(computeContentDigest(stage) === snapshot.digest, 'Staged plugin digest changed during copy')
-  return stage
+  try {
+    cpSync(snapshot.pluginRoot, stage, { recursive: true, dereference: false, errorOnExist: true })
+    assert(computeContentDigest(stage) === snapshot.digest, 'Staged plugin digest changed during copy')
+    return stage
+  } catch (error) {
+    rmSync(stage, { recursive: true, force: true })
+    throw error
+  }
 }
 
 function preflightFreshInstall(repositoryRoot, paths, snapshot) {
   validateRepositoryAnchors(paths)
-  const desiredLock = lockForSnapshot(snapshot)
+  const desiredLock = lockForSnapshot(snapshot, paths)
   const lockType = pathType(paths.lock)
 
   if (lockType !== 'missing') {
     assert(lockType === 'file', `Vendor lock path is occupied by ${lockType}: ${paths.lock}`)
-    const installed = verifyInstalledRepository(repositoryRoot, snapshot.codex.name)
-    const same = installed.lock.releaseTag === desiredLock.releaseTag
+    const installed = verifyInstalledRepository(repositoryRoot, snapshot.codex.name, paths)
+    const same = !installed.legacyCatalog && installed.lock.releaseTag === desiredLock.releaseTag
       && installed.lock.commitSha === desiredLock.commitSha
       && installed.lock.contentDigest === desiredLock.contentDigest
       && JSON.stringify(installed.lock.managedSymlinks) === JSON.stringify(desiredLock.managedSymlinks)
@@ -413,7 +455,7 @@ function applyFreshInstall(repositoryRoot, paths, snapshot, preflight) {
     makeDirectory(paths.agents, createdDirectories)
     makeDirectory(paths.plugins, createdDirectories)
     makeDirectory(paths.skills, createdDirectories)
-    makeDirectory(paths.claude, createdDirectories)
+    if (paths.claude) makeDirectory(paths.claude, createdDirectories)
 
     if (!preflight.adoptVendor) {
       stagedPlugin = stagePlugin(snapshot, paths)
@@ -431,7 +473,7 @@ function applyFreshInstall(repositoryRoot, paths, snapshot, preflight) {
 
     atomicWriteJson(paths.lock, preflight.desiredLock)
     lockCreated = true
-    verifyInstalledRepository(repositoryRoot, snapshot.codex.name)
+    verifyInstalledRepository(repositoryRoot, snapshot.codex.name, paths)
   } catch (error) {
     if (lockCreated) rmSync(paths.lock, { force: true })
     for (const link of [...createdLinks].reverse()) {
@@ -446,15 +488,15 @@ function applyFreshInstall(repositoryRoot, paths, snapshot, preflight) {
 }
 
 function preflightUpdate(repositoryRoot, paths, snapshot) {
-  const installed = verifyInstalledRepository(repositoryRoot, snapshot.codex.name)
-  const desiredLock = lockForSnapshot(snapshot)
+  const installed = verifyInstalledRepository(repositoryRoot, snapshot.codex.name, paths)
+  const desiredLock = lockForSnapshot(snapshot, paths)
   if (JSON.stringify(installed.lock) === JSON.stringify(desiredLock)) {
     return { installed, desiredLock, alreadyInstalled: true, staleLinks: [], newLinks: [] }
   }
 
-  const oldByPath = new Map(installed.lock.managedSymlinks.map((link) => [link.path, link]))
+  const oldByPath = new Map(installed.managedLinks.map((link) => [link.path, link]))
   const newByPath = new Map(desiredLock.managedSymlinks.map((link) => [link.path, link]))
-  const staleLinks = installed.lock.managedSymlinks.filter((link) => !newByPath.has(link.path))
+  const staleLinks = installed.managedLinks.filter((link) => !newByPath.has(link.path))
   const addedLinks = desiredLock.managedSymlinks.filter((link) => !oldByPath.has(link.path))
   const newLinks = []
 
@@ -482,9 +524,9 @@ function applyUpdate(repositoryRoot, paths, snapshot, preflight) {
   try {
     stagedPlugin = stagePlugin(snapshot, paths)
     renameSync(paths.vendor, vendorBackup)
+    vendorSwapped = true
     renameSync(stagedPlugin, paths.vendor)
     stagedPlugin = null
-    vendorSwapped = true
 
     for (const link of preflight.staleLinks) {
       assertExactSymlink(repositoryRoot, link)
@@ -501,7 +543,7 @@ function applyUpdate(repositoryRoot, paths, snapshot, preflight) {
     renameSync(paths.lock, lockBackup)
     atomicWriteJson(paths.lock, preflight.desiredLock)
     lockSwapped = true
-    verifyInstalledRepository(repositoryRoot, snapshot.codex.name)
+    verifyInstalledRepository(repositoryRoot, snapshot.codex.name, paths)
     completed = true
   } catch (error) {
     if (completed) throw error
@@ -542,7 +584,7 @@ function applyUninstall(repositoryRoot, paths, installed) {
     renameSync(paths.lock, lockBackup)
     lockMoved = true
 
-    for (const link of installed.lock.managedSymlinks) {
+    for (const link of installed.managedLinks) {
       assertExactSymlink(repositoryRoot, link)
       unlinkSync(resolve(repositoryRoot, link.path))
       removedLinks.push(link)
@@ -572,10 +614,10 @@ export function installRepository(options, dependencies = {}) {
   if (operation === 'check') assert(!apply, '--check is always read-only and cannot be combined with --apply')
 
   const repositoryRoot = validateGitRoot(options.repositoryRoot ?? options.repo, 'Consumer repository')
-  const paths = repositoryPaths(repositoryRoot, pluginId)
+  const paths = repositoryPaths(repositoryRoot, pluginId, options.catalogRoot)
 
   if (operation === 'check') {
-    const installed = verifyInstalledRepository(repositoryRoot, pluginId)
+    const installed = verifyInstalledRepository(repositoryRoot, pluginId, paths)
     return {
       operation,
       applied: false,
@@ -585,7 +627,7 @@ export function installRepository(options, dependencies = {}) {
   }
 
   if (operation === 'uninstall') {
-    const installed = verifyInstalledRepository(repositoryRoot, pluginId)
+    const installed = verifyInstalledRepository(repositoryRoot, pluginId, paths)
     if (apply) applyUninstall(repositoryRoot, paths, installed)
     return {
       operation,
@@ -628,6 +670,7 @@ export function installRepository(options, dependencies = {}) {
     }
 
     if (apply) {
+      validateRepositoryAnchors(paths)
       if (operation === 'update') applyUpdate(repositoryRoot, paths, snapshot, preflight)
       else applyFreshInstall(repositoryRoot, paths, snapshot, preflight)
     }
@@ -648,7 +691,7 @@ export function installRepository(options, dependencies = {}) {
 export function parseArguments(argv) {
   const values = {}
   const switches = new Set()
-  const valueFlags = new Set(['--repo', '--plugin', '--ref', '--source'])
+  const valueFlags = new Set(['--repo', '--plugin', '--ref', '--source', '--catalog-root'])
   const switchFlags = new Set(['--apply', '--check', '--update', '--uninstall', '--help'])
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -693,6 +736,7 @@ export function parseArguments(argv) {
     pluginId: values['--plugin'],
     releaseTag: values['--ref'],
     source: values['--source'],
+    catalogRoot: values['--catalog-root'],
     operation,
     apply,
   }

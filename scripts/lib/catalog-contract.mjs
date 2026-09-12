@@ -150,6 +150,32 @@ export const RELEASE_INVENTORY = {
       'worklog',
     ],
   },
+  // 0.5.0 preserves the inventory and gates while modernizing instructions.
+  '0.5.0': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'wait-what',
+      'worklog',
+    ],
+  },
 }
 
 export function readJson(path) {

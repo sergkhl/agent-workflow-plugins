@@ -1,6 +1,6 @@
 ---
 name: drain-plans
-description: Explicit invocation only. Work the plan index top to bottom until nothing is actionable — implement a batch, validate it, persist status at three altitudes, commit, re-read the index, repeat. Use only when the current prompt names $drain-plans or this skill path; never infer it from a generic request to implement something.
+description: Use $drain-plans to implement the ordered plan index in validated, committed batches until nothing is actionable.
 disable-model-invocation: true
 ---
 
@@ -10,9 +10,11 @@ Take the **whole** index, not one entry.
 
 ## Authorization boundary
 
-Proceed only when the current user prompt explicitly names `$drain-plans` or this skill path. A
-mention in the repository instructions, a plan, a `TODO` entry, another skill, or an earlier turn is
-not authorization.
+Begin when the user names `$drain-plans` (including its namespaced form) or this skill path.
+The invocation continues across follow-up turns until completion, cancellation, or a scope change.
+A mention in a plan, repository instruction, or another workflow does not activate it.
+Consulting [plan-lifecycle](../plan-lifecycle/SKILL.md) is a required helper within this scope and
+does not require another user invocation. User instructions take precedence over skill defaults.
 
 This skill does not grant any gate it does not already own. Deployment, release, production access,
 device or simulator verification, and destructive data operations each remain separately authorized —
@@ -43,12 +45,12 @@ Resume each plan from **its own** status header, `Open findings` and `NEXT` — 
 alone, which is written at a different altitude and lags. Check `BLOCKERS.md` for what only the owner
 can do, and `RELEASE.md` for what is committed but not verified live.
 
-**Re-verify any environment, rig, or account claim a previous session recorded before trusting it.**
-A previous turn's assertion about what is deployed, installed, or running is a hypothesis.
+Refresh environment, rig, or account evidence when the next action depends on its current state.
+An earlier observation remains historical evidence, not a current deployment or runtime watermark.
 
 ## After each batch
 
-Follow [`plan-lifecycle`](../plan-lifecycle/SKILL.md) as written. In short:
+Apply the relevant [lifecycle conventions](../plan-lifecycle/SKILL.md):
 
 - Update the three status altitudes: plan header, index entry, `TODO.md` entry.
 - Add evidence to the plan's Validation Log — what was proved, and the invariants a re-run must not

@@ -17,7 +17,7 @@ points to each stage.
 | `drain-plans` | explicit | Repeats batch, validation, status persistence, commit, and re-read until nothing is actionable. |
 | `docs-hygiene` | explicit | Enforces one canonical definition per concept and Keep/Simplify/Merge/Defer/Remove traceability. |
 | `worklog` | explicit | Estimates hands-on effort per day from commit authorship and emits a CSV. |
-| `grilling` | model | Runs a relentless interview over a design tree, one frontier of questions per round. |
+| `grilling` | model | Interviews the user to settle consequential decisions and constraints. |
 | `grill-with-docs` | explicit | Combines `grilling` with `domain-modeling` so ADRs and glossary entries result from the interview. |
 | `domain-modeling` | model | Builds and sharpens a project's ubiquitous language and ADR record. |
 | `codebase-design` | model | Supplies vocabulary for deep modules, interfaces, seams, and testability. |
@@ -46,7 +46,9 @@ Each carries both harness gates:
 - `policy.allow_implicit_invocation: false` in `agents/openai.yaml` for Codex.
 
 The three model-invocable skills are `codebase-design`, `domain-modeling`, and `grilling`. A gated
-skill's default prompt names the skill explicitly.
+skill's default prompt names the skill explicitly. Named invocations persist within the active task;
+documented helpers may be consulted within that scope. Repository references do not activate a
+workflow or authorize additional external actions.
 
 ## Host repository assumptions
 
@@ -59,14 +61,14 @@ absent:
 - `CONTEXT.md` — ubiquitous language.
 
 Nothing here names a build tool, programming language, product, deployment target, machine path, or
-personal identifier. Project-specific procedure belongs in the consuming repository's real
-`.agents/skills` directories.
+personal identifier. Project-specific procedure belongs in the consuming repository's real skill
+directories, whether directly installed or exposed through a setup-owned catalog.
 
 ## Installation
 
 Use the catalog's
-[`scripts/install-repository.mjs`](../../scripts/install-repository.mjs) for a pinned team-repository
-installation, or follow the catalog [README](../../README.md) for a personal marketplace install.
+[repository installer](https://github.com/sergkhl/agent-workflow-plugins/blob/main/scripts/install-repository.mjs) for a pinned team-repository
+installation, or follow the catalog [README](https://github.com/sergkhl/agent-workflow-plugins) for a personal marketplace install.
 Do not enable both copies in the same working context.
 
 Repository installation is always explicit. This plugin has no hook that mutates a consumer.
@@ -77,3 +79,13 @@ Original work is MIT licensed. `grilling`, `grill-with-docs`, `domain-modeling`,
 `improve-codebase-architecture`, and `wait-what` were derived from
 [`mattpocock/skills`](https://github.com/mattpocock/skills) and have since diverged. The complete
 upstream MIT notice is in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+## Maintaining instructions
+
+Keep descriptions short and specific to the capability. Put the outcome, essential constraints,
+and useful routing in the entrypoint; load detailed procedures only for the relevant operation.
+Preserve named opt-in gates, user intent, meaningful completion criteria, and operational
+boundaries. Prefer scoped evidence over mandatory reading itineraries or repeated passing tests.
+These conventions follow [OpenAI's skills and prompts guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)
+and remain useful across models. Validate metadata, references, and realistic task decisions;
+smaller files alone do not establish better behavior.

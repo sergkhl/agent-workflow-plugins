@@ -369,3 +369,207 @@ test('symlink-permission failure explains remediation and never falls back to co
     /requires real directory symlinks and never falls back to copies.*symlink permission/is)
   assert.deepEqual(treeSnapshot(consumer), beforeState)
 })
+
+const RESOURCE_ROOT = 'dev-setup/catalog'
+
+function verifyCatalog(consumer) {
+  return verifyInstalledRepository(consumer, PLUGIN_ID, { catalogRoot: RESOURCE_ROOT })
+}
+
+function addPresetLinks(consumer) {
+  const project = resolve(consumer, RESOURCE_ROOT, 'skills', 'project-only')
+  mkdirSync(project, { recursive: true })
+  writeFileSync(resolve(project, 'SKILL.md'), '# Project-owned fixture\n')
+  mkdirSync(resolve(consumer, '.agents', 'skills'), { recursive: true })
+  mkdirSync(resolve(consumer, '.claude'))
+  symlinkSync('../dev-setup/catalog/plugins', resolve(consumer, '.agents', 'plugins'), 'dir')
+  symlinkSync('../../dev-setup/catalog/skills/project-only',
+    resolve(consumer, '.agents', 'skills', 'project-only'), 'dir')
+  for (const name of ['drain-plans', 'wait-what']) {
+    symlinkSync(`../../dev-setup/catalog/skills/${name}`,
+      resolve(consumer, '.agents', 'skills', name), 'dir')
+  }
+  symlinkSync('../.agents/skills', resolve(consumer, '.claude', 'skills'), 'dir')
+  writeFileSync(resolve(consumer, 'preset.json'), '{"selected":"fixture-preset"}\n')
+  return project
+}
+
+function updateCatalog(consumer, extra = {}, dependencies = {}) {
+  return installBase(consumer, {
+    catalogRoot: RESOURCE_ROOT,
+    operation: 'update',
+    source: upgradeCatalog,
+    releaseTag: UPGRADE_RELEASE_TAG,
+    ...extra,
+  }, dependencies)
+}
+
+test('catalog preflight, install, check, and repeat preserve setup-owned discovery and project skills', () => {
+  const consumer = makeConsumer('catalog')
+  addPresetLinks(consumer)
+  const beforeState = treeSnapshot(consumer)
+  const preflight = installBase(consumer, { catalogRoot: RESOURCE_ROOT, apply: false })
+  assert.equal(preflight.applied, false)
+  assert.deepEqual(treeSnapshot(consumer), beforeState)
+  const first = installBase(consumer, { catalogRoot: RESOURCE_ROOT })
+  assert.equal(first.lock.schemaVersion, 2)
+  assert.deepEqual(first.lock.layout, { type: 'catalog', root: RESOURCE_ROOT })
+  assert.ok(first.lock.managedSymlinks.every(link => link.path.startsWith(`${RESOURCE_ROOT}/skills/`)))
+  assert.equal(first.lock.managedSymlinks.length, BASE_SKILLS.length)
+  verifyCatalog(consumer)
+  const installed = treeSnapshot(consumer)
+  const again = installBase(consumer, { catalogRoot: RESOURCE_ROOT })
+  assert.equal(again.applied, false)
+  assert.deepEqual(treeSnapshot(consumer), installed)
+  for (const row of beforeState) assert.ok(installed.includes(row), row)
+  const check = installRepository({ repositoryRoot: consumer, pluginId: PLUGIN_ID,
+    catalogRoot: RESOURCE_ROOT, operation: 'check' })
+  assert.equal(check.applied, false)
+  assert.deepEqual(treeSnapshot(consumer), installed)
+})
+
+test('catalog update and uninstall touch only catalog-managed resources', () => {
+  const consumer = makeConsumer('catalog-update')
+  addPresetLinks(consumer)
+  const preserved = treeSnapshot(consumer)
+  installBase(consumer, { catalogRoot: RESOURCE_ROOT })
+  const beforeUpdate = treeSnapshot(consumer)
+  updateCatalog(consumer, { apply: false })
+  assert.deepEqual(treeSnapshot(consumer), beforeUpdate)
+  updateCatalog(consumer)
+  assert.ok(existsSync(resolve(consumer, RESOURCE_ROOT, 'skills', 'future-skill')))
+  assert.equal(existsSync(resolve(consumer, RESOURCE_ROOT, 'skills', 'wait-what')), false)
+  verifyCatalog(consumer)
+  const beforeUninstall = treeSnapshot(consumer)
+  const options = { repositoryRoot: consumer, pluginId: PLUGIN_ID,
+    catalogRoot: RESOURCE_ROOT, operation: 'uninstall' }
+  installRepository(options)
+  assert.deepEqual(treeSnapshot(consumer), beforeUninstall)
+  installRepository({ ...options, apply: true })
+  const finalState = treeSnapshot(consumer)
+  for (const row of preserved) assert.ok(finalState.includes(row), row)
+  assert.equal(existsSync(resolve(consumer, RESOURCE_ROOT, 'plugins', PLUGIN_ID)), false)
+  assert.ok(lstatSync(resolve(consumer, '.agents', 'plugins')).isSymbolicLink())
+})
+
+test('catalog installation refuses a portable name occupied by a project skill without writes', () => {
+  const consumer = makeConsumer('catalog-project-collision')
+  addPresetLinks(consumer)
+  const project = resolve(consumer, RESOURCE_ROOT, 'skills', 'grilling')
+  mkdirSync(project)
+  writeFileSync(resolve(project, 'SKILL.md'), '# Project-owned grilling skill\n')
+  const beforeState = treeSnapshot(consumer)
+  assert.throws(() => installBase(consumer, { catalogRoot: RESOURCE_ROOT }), /occupied by directory/)
+  assert.deepEqual(treeSnapshot(consumer), beforeState)
+})
+
+test('legacy catalog lock migrates only on update after verifying actual catalog links', () => {
+  const consumer = makeConsumer('legacy-catalog')
+  installBase(consumer)
+  mkdirSync(resolve(consumer, 'dev-setup'))
+  renameSync(resolve(consumer, '.agents'), resolve(consumer, RESOURCE_ROOT))
+  unlinkSync(resolve(consumer, '.claude', 'skills'))
+  const beforeState = treeSnapshot(consumer)
+  assert.equal(verifyCatalog(consumer).legacyCatalog, true)
+  assert.equal(verifyCatalog(consumer).lock.schemaVersion, 1)
+  installBase(consumer, { catalogRoot: RESOURCE_ROOT, operation: 'update', apply: false })
+  assert.deepEqual(treeSnapshot(consumer), beforeState)
+  assert.throws(() => installBase(consumer, { catalogRoot: RESOURCE_ROOT }), /use --update/)
+  assert.deepEqual(treeSnapshot(consumer), beforeState)
+  installBase(consumer, { catalogRoot: RESOURCE_ROOT, operation: 'update' })
+  const verified = verifyCatalog(consumer)
+  assert.equal(verified.legacyCatalog, false)
+  assert.equal(verified.lock.schemaVersion, 2)
+  assert.equal(existsSync(resolve(consumer, '.agents')), false)
+  assert.deepEqual(readdirSync(resolve(consumer, '.claude')), [])
+})
+
+test('catalog migration rejects altered vendor content, manifests, and managed links without writes', () => {
+  for (const alteration of ['vendor', 'manifest', 'link']) {
+    const consumer = makeConsumer(`legacy-${alteration}`)
+    installBase(consumer)
+    mkdirSync(resolve(consumer, 'dev-setup'))
+    renameSync(resolve(consumer, '.agents'), resolve(consumer, RESOURCE_ROOT))
+    if (alteration === 'vendor') {
+      appendFileSync(resolve(consumer, RESOURCE_ROOT, 'plugins', PLUGIN_ID, 'README.md'), '\nmodified\n')
+    } else if (alteration === 'manifest') {
+      const vendor = resolve(consumer, RESOURCE_ROOT, 'plugins', PLUGIN_ID)
+      const manifestPath = resolve(vendor, '.claude-plugin', 'plugin.json')
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+      manifest.skills.pop()
+      writeJson(manifestPath, manifest)
+      // Even a recomputed digest must not hide a manifest/inventory mismatch.
+      const lockPath = resolve(consumer, RESOURCE_ROOT, 'plugins', `${PLUGIN_ID}.vendor.json`)
+      const lock = JSON.parse(readFileSync(lockPath, 'utf8'))
+      lock.contentDigest = computeContentDigest(vendor)
+      writeJson(lockPath, lock)
+    } else {
+      const link = resolve(consumer, RESOURCE_ROOT, 'skills', 'wait-what')
+      unlinkSync(link)
+      symlinkSync('../unowned', link, 'dir')
+    }
+    const beforeState = treeSnapshot(consumer)
+    assert.throws(() => updateCatalog(consumer), /local modifications|manifest skill inventory|points to .*expected/)
+    assert.deepEqual(treeSnapshot(consumer), beforeState)
+  }
+})
+
+test('catalog roots reject unsafe paths and symlink ancestors without writes', () => {
+  for (const catalogRoot of ['../escape', '/tmp/catalog', '.', '.git/resources',
+    '.GIT/resources', '.Agents', '.CLAUDE', 'catalog.',
+    '.agents', 'dev-setup/../catalog', 'dev-setup//catalog', 'C:\\catalog']) {
+    const consumer = makeConsumer('unsafe-catalog')
+    const beforeState = treeSnapshot(consumer)
+    assert.throws(() => installBase(consumer, { catalogRoot }), /safe repository-relative/)
+    assert.deepEqual(treeSnapshot(consumer), beforeState)
+  }
+  const consumer = makeConsumer('catalog-symlink-parent')
+  const external = makeConsumer('unrelated-directory')
+  symlinkSync(external, resolve(consumer, 'dev-setup'), 'dir')
+  const beforeState = treeSnapshot(consumer)
+  const beforeExternal = treeSnapshot(external)
+  assert.throws(() => installBase(consumer, { catalogRoot: RESOURCE_ROOT }), /must be a real directory/)
+  assert.deepEqual(treeSnapshot(consumer), beforeState)
+  assert.deepEqual(treeSnapshot(external), beforeExternal)
+})
+
+test('catalog lock rejects a mismatched layout or a path outside its managed skill root', () => {
+  for (const corruption of ['layout', 'link']) {
+    const consumer = makeConsumer(`catalog-lock-${corruption}`)
+    installBase(consumer, { catalogRoot: RESOURCE_ROOT })
+    const path = resolve(consumer, RESOURCE_ROOT, 'plugins', `${PLUGIN_ID}.vendor.json`)
+    const lock = JSON.parse(readFileSync(path, 'utf8'))
+    if (corruption === 'layout') lock.layout.root = 'other/catalog'
+    else lock.managedSymlinks[0].path = '../outside'
+    writeJson(path, lock)
+    const beforeState = treeSnapshot(consumer)
+    assert.throws(() => verifyCatalog(consumer), /layout does not match|Unsafe managed symlink/)
+    assert.deepEqual(treeSnapshot(consumer), beforeState)
+  }
+})
+
+test('catalog update rolls back the vendor, lock, and removed links after a new-link collision', () => {
+  const consumer = makeConsumer('catalog-rollback')
+  addPresetLinks(consumer)
+  installBase(consumer, { catalogRoot: RESOURCE_ROOT })
+  let beforeApply
+  assert.throws(() => updateCatalog(consumer, {}, { symlinkProbe() {
+    // Another actor adds an unowned directory after preflight; preserve that addition on rollback.
+    mkdirSync(resolve(consumer, RESOURCE_ROOT, 'skills', 'future-skill'))
+    beforeApply = treeSnapshot(consumer)
+  } }), /changed after preflight/)
+  assert.deepEqual(treeSnapshot(consumer), beforeApply)
+  assert.equal(verifyCatalog(consumer).lock.releaseTag, BASE_RELEASE_TAG)
+})
+
+test('CLI catalog selection supports every operation without changing direct-install defaults', () => {
+  const consumer = makeConsumer('catalog-cli')
+  const cli = resolve(catalogWorkingTree, 'scripts', 'install-repository.mjs')
+  const args = [cli, '--repo', consumer, '--plugin', PLUGIN_ID, '--catalog-root', RESOURCE_ROOT]
+  run(process.execPath, [...args, '--source', baseCatalog, '--ref', BASE_RELEASE_TAG, '--apply'], consumer)
+  run(process.execPath, [...args, '--check'], consumer)
+  run(process.execPath, [...args, '--source', upgradeCatalog, '--ref', UPGRADE_RELEASE_TAG, '--update', '--apply'], consumer)
+  assert.equal(verifyCatalog(consumer).lock.releaseTag, UPGRADE_RELEASE_TAG)
+  run(process.execPath, [...args, '--uninstall', '--apply'], consumer)
+  assert.equal(existsSync(resolve(consumer, '.agents')), false)
+})

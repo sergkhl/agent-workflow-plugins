@@ -16,13 +16,13 @@ checks in repository-scoped skill links for both Codex and Claude:
 .claude/skills -> ../.agents/skills        one shared Claude entry point
 ```
 
-Install release `0.4.0` from the public tag:
+Install release `0.5.0` from the public tag:
 
 ```bash
 node scripts/install-repository.mjs \
   --repo <consumer-repository-root> \
   --plugin agent-workflow-core \
-  --ref agent-workflow-core--v0.4.0 \
+  --ref agent-workflow-core--v0.5.0 \
   --apply
 ```
 
@@ -32,7 +32,7 @@ When developing the catalog locally, replace the network fetch with a clean, tag
 node scripts/install-repository.mjs \
   --repo <consumer-repository-root> \
   --plugin agent-workflow-core \
-  --ref agent-workflow-core--v0.4.0 \
+  --ref agent-workflow-core--v0.5.0 \
   --source . \
   --apply
 ```
@@ -64,6 +64,28 @@ On Windows, enable Developer Mode or grant symlink permission and retry.
 The lock at `.agents/plugins/agent-workflow-core.vendor.json` records the public repository, release
 tag, exact commit, plugin version, content digest, and every installer-managed symlink. Project-only
 skills remain real directories beside the portable links in `.agents/skills`.
+
+### Catalog-backed repository installation
+
+When a repository's setup owns discovery links, add `--catalog-root <repo-relative-directory>`
+to every installer operation. For example:
+
+```bash
+node scripts/install-repository.mjs --repo <root> --plugin agent-workflow-core \
+  --catalog-root dev-setup/catalog --ref agent-workflow-core--v0.5.0 --update --apply
+```
+
+This manages the selected plugin snapshot and lock under `<catalog-root>/plugins/`, and its portable links under
+`<catalog-root>/skills/`. It does not change a preset or create `.agents`/`.claude` discovery links.
+Catalog locks use schema 2 and record the layout plus actual managed paths. Direct installations
+retain schema 1. A relocated schema-1 snapshot is checked against its manifests, content digest,
+and actual catalog skill links; only `--update --apply` migrates its lock. Unrelated project skills
+and generated discovery links remain owned by the consumer. Catalog roots must be relative paths
+with real directory ancestors; escaping paths and symlinked anchors are rejected.
+
+`--check`, preflight without `--apply`, and uninstall accept the same `--catalog-root` option.
+Public consumers must reference a published immutable tag; a local tag plus `--source` supports
+review and validation before publishing.
 
 ### Marketplace installation (recommended for personal/global use)
 
@@ -107,8 +129,8 @@ its own marketplace plugin at the same time.
 - Marketplace ID: `agent-workflow`
 - Marketplace display name: `Agent Workflow Plugins`
 - Plugin ID: `agent-workflow-core`
-- Current version: `0.4.0`
-- Release tag: `agent-workflow-core--v0.4.0`
+- Current version: `0.5.0`
+- Release tag: `agent-workflow-core--v0.5.0`
 - Plugin path: `./plugins/agent-workflow-core`
 - Installation policy: `AVAILABLE`
 - Authentication policy: `ON_INSTALL`

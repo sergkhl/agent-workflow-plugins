@@ -1,6 +1,6 @@
 ---
 name: docs-hygiene
-description: Explicit invocation only. Sweep the documentation set so every concept has exactly one canonical definition and every retained section is traceable to a real consumer, then consolidate or delete the rest. Use only when the current prompt names $docs-hygiene or this skill path.
+description: Use $docs-hygiene to consolidate documentation into authoritative, useful definitions and procedures.
 disable-model-invocation: true
 ---
 
@@ -10,9 +10,10 @@ Two sweeps over the same material. Run both; they catch different failures.
 
 ## Authorization boundary
 
-Proceed only when the current user prompt explicitly names `$docs-hygiene` or this skill path. This
-skill deletes and rewrites tracked documentation across many files, so a mention in a plan or an
-earlier turn is not authorization.
+Begin when the user names `$docs-hygiene` (including its namespaced form) or this skill path.
+Continue that invocation through follow-up turns until completion, cancellation, or a scope change.
+A repository mention does not activate a sweep. Apply it to the requested documentation set;
+a repository-wide sweep requires that scope.
 
 Deleting is the point, not a side effect — but **never delete a document that was never committed**.
 Commit it first, then delete it in a later commit. Git history is the archive; content that exists
@@ -20,11 +21,9 @@ nowhere in history must not be deleted from anywhere.
 
 ## What to read
 
-- `CONTEXT.md` — the ubiquitous language.
-- `docs/adr/README.md` and the ADRs it links.
-- `docs/plans/README.md` and the linked plans, `TODO.md`, `RELEASE.md`, `BLOCKERS.md`.
-- The repository instruction file every agent loads.
-- Every runbook and README the above link to.
+Start with the requested documents and their actual consumers. Follow links to the relevant
+glossary, ADRs, plans, or runbooks when ownership or consistency depends on them. Do not expand a
+scoped cleanup into an unrelated repository-wide reading itinerary.
 
 ## Sweep one — one canonical definition
 
@@ -69,6 +68,7 @@ explicitly rather than preserving speculative complexity — an open question be
 
 ## Output
 
-Report the classification before acting on `Remove` and `Merge`, so the owner can object. Then apply
-`Keep`, `Simplify` and the uncontested consolidations. Deletions get their own commit, whose message
+Explain meaningful removals and consolidations, then complete the authorized cleanup. Ask only
+when unresolved ownership or scope would change the result; do not require another approval for
+an already authorized consolidation. Deletions get their own commit, whose message
 names what was deleted and where its content now lives.

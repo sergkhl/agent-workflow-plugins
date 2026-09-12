@@ -1,6 +1,6 @@
 interface:
   display_name: "Docs Hygiene"
-  short_description: "One canonical definition per concept; delete the untraceable rest"
-  default_prompt: "Use $docs-hygiene to sweep the documentation set for duplicated definitions and untraceable sections."
+  short_description: "Consolidate documentation into maintained sources"
+  default_prompt: "Use $docs-hygiene to consolidate the requested documentation."
 policy:
   allow_implicit_invocation: false

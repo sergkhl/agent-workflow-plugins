@@ -1,6 +1,6 @@
 ---
 name: worklog
-description: Explicit invocation only. Estimate hands-on engineering effort per day from commit authorship and emit a timesheet CSV. Use only when the current prompt names $worklog or this skill path; never infer it from a question about how long something took.
+description: Use $worklog to estimate one author’s hands-on effort from Git history and produce a daily timesheet CSV.
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Produce a per-day estimate of **one person's actual working time** for a date range, as a CSV.
 
-Ask for whatever the prompt did not supply: the date range, the author identity to attribute by, the
+Use inputs already supplied in the task; ask only for missing essentials: the date range, the author identity to attribute by, the
 reporting timezone, and where the file goes. Do not guess an identity from the git config — the person
 asking may not be the only author.
 
@@ -19,7 +19,8 @@ reflect that rather than the span.
 
 ## Authorization boundary
 
-Proceed only when the current user prompt explicitly names `$worklog` or this skill path. "How long
+Begin when the user names `$worklog` (including its namespaced form) or this skill path.
+Continue the same invocation through follow-ups until completion, cancellation, or a scope change. "How long
 did that take" and "how much have I done this week" are questions to answer in prose, not triggers
 for this skill.
 
