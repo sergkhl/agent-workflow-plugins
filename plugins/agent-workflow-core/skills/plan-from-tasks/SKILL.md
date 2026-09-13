@@ -23,10 +23,14 @@ terms you need, relevant ADRs for constraints, and `docs/plans/README.md` for pl
 with existing work. Read individual plans only when they affect this task. Production, device,
 and destructive investigations still need their own authority.
 
-Use [grilling](../grilling/SKILL.md) to settle consequential choices with the user. Explain an ADR
-conflict as a proposed policy change. Prioritize user experience, durability, and low complexity;
-identify justified simplifications within the requested scope. Treat local state as disposable
-only when the environment and authorization establish that it is.
+Use [grilling](../grilling/SKILL.md) to settle consequential choices with the user, including its
+final-message question handoff when cards are asynchronous or unavailable. Carry confirmed choices
+forward and ask only about material unknowns. Once those are settled, continue directly to writing,
+registration, validation, and commit; do not ask for another confirmation of the requested planning.
+
+Explain an ADR conflict as a proposed policy change. Prioritize user experience, durability, and low
+complexity; identify justified simplifications within the requested scope. Treat local state as
+disposable only when the environment and authorization establish that it is.
 
 ## Record the plan
 

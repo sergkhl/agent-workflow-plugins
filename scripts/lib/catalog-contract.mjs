@@ -254,6 +254,32 @@ export const RELEASE_INVENTORY = {
       'worklog',
     ],
   },
+  // 0.6.3 keeps asynchronous questions visible and resumes settled planning directly.
+  '0.6.3': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'research',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'wait-what',
+      'worklog',
+    ],
+  },
 }
 
 export function readJson(path) {

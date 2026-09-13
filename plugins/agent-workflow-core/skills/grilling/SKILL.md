@@ -13,16 +13,17 @@ Ask the independent questions whose prerequisites are settled in one manageable 
 recommended answer and its tradeoff for each. Use concrete scenarios to expose ambiguity rather
 than visiting every hypothetical branch.
 
-Make the questions the round's final handoff. Use the host's question cards when available;
-otherwise put the full questions and recommendations in a numbered list at the end of the reply.
-With an asynchronous question tool, make it the last tool call and follow it only with a brief
-handoff, then yield. Do not bury the batch under further research, progress updates, or another
-batch while answers are pending. A blocking question tool already supplies the handoff; continue
-when it returns the answers.
+Make the questions the round's final handoff. Use the host's question cards when available in the
+current mode. With an asynchronous question tool, make it the last tool call, then include every
+full question, its recommendation, and the tradeoff in a numbered list in the final reply and yield.
+A tool's acceptance receipt does not establish that the user can see its cards. The reply itself
+must be enough to answer; never substitute a note that questions are pending. Do not bury the batch
+under further research, progress updates, or another batch while answers are pending. A blocking
+question tool already supplies the handoff; continue when it returns the answers.
 
 After answers arrive, retain confirmed choices and adapt the next round to what changed. Re-ask
-only unresolved questions, with their recommendations, at the next handoff. If the user could not
-see the cards, use the numbered-list fallback; never just say that earlier questions are pending.
+only unresolved questions, with their recommendations, at the next handoff. If cards are unavailable
+or the user reports not seeing them, use the numbered list directly instead of sending another card.
 An unanswered or preselected recommendation is not a user decision.
 
 Resolve routine details from the user's stated constraints. Use independent investigations only
