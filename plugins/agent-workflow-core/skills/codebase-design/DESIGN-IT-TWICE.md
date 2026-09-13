@@ -5,7 +5,7 @@ user's constraints, actual callers, dependencies, and [design criteria](referenc
 Consult [DEEPENING.md](DEEPENING.md) when dependency placement is part of the question.
 
 Explore meaningfully different options, such as minimizing the interface or simplifying the most
-common caller. Use enough alternatives to reveal a real tradeoff; there is no required agent count.
+common caller. Use enough alternatives to reveal a real tradeoff.
 Independent designs may run in parallel when delegation is permitted and useful. Otherwise compare
 them locally. Give any delegate the same relevant constraints and a distinct design objective.
 

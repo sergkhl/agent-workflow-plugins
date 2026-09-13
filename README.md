@@ -1,7 +1,7 @@
 # Agent Workflow Plugins
 
-`agent-workflow-plugins` is the public catalog for `agent-workflow-core` and future reusable agent
-workflow plugins. The catalog supports two deliberately separate installation modes.
+`agent-workflow-plugins` is the public catalog for `agent-workflow-core`, a set of reusable design,
+planning, and documentation skills. The catalog supports two installation modes.
 
 ## Choose one installation mode
 
@@ -16,13 +16,13 @@ checks in repository-scoped skill links for both Codex and Claude:
 .claude/skills -> ../.agents/skills        one shared Claude entry point
 ```
 
-Install release `0.6.0` from the public tag:
+Install release `0.6.1` from the public tag:
 
 ```bash
 node scripts/install-repository.mjs \
   --repo <consumer-repository-root> \
   --plugin agent-workflow-core \
-  --ref agent-workflow-core--v0.6.0 \
+  --ref agent-workflow-core--v0.6.1 \
   --apply
 ```
 
@@ -32,7 +32,7 @@ When developing the catalog locally, replace the network fetch with a clean, tag
 node scripts/install-repository.mjs \
   --repo <consumer-repository-root> \
   --plugin agent-workflow-core \
-  --ref agent-workflow-core--v0.6.0 \
+  --ref agent-workflow-core--v0.6.1 \
   --source . \
   --apply
 ```
@@ -72,7 +72,7 @@ to every installer operation. For example:
 
 ```bash
 node scripts/install-repository.mjs --repo <root> --plugin agent-workflow-core \
-  --catalog-root dev-setup/catalog --ref agent-workflow-core--v0.6.0 --update --apply
+  --catalog-root dev-setup/catalog --ref agent-workflow-core--v0.6.1 --update --apply
 ```
 
 This manages the selected plugin snapshot and lock under `<catalog-root>/plugins/`, and its portable links under
@@ -129,8 +129,8 @@ its own marketplace plugin at the same time.
 - Marketplace ID: `agent-workflow`
 - Marketplace display name: `Agent Workflow Plugins`
 - Plugin ID: `agent-workflow-core`
-- Current version: `0.6.0`
-- Release tag: `agent-workflow-core--v0.6.0`
+- Current version: `0.6.1`
+- Release tag: `agent-workflow-core--v0.6.1`
 - Plugin path: `./plugins/agent-workflow-core`
 - Installation policy: `AVAILABLE`
 - Authentication policy: `ON_INSTALL`
@@ -142,8 +142,7 @@ Run all catalog and installer tests with:
 npm test
 ```
 
-The installer is the only repository mutation mechanism. The plugin intentionally has no automatic
-`SessionStart` hook.
+The installer manages repository-scoped snapshots, locks, and discovery links.
 
 ## License
 

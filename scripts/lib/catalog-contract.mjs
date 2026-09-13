@@ -202,6 +202,32 @@ export const RELEASE_INVENTORY = {
       'worklog',
     ],
   },
+  // 0.6.1 refines instructions with the same skill inventory and invocation gates.
+  '0.6.1': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'research',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'wait-what',
+      'worklog',
+    ],
+  },
 }
 
 export function readJson(path) {

@@ -3,10 +3,8 @@
 A plan-driven workflow for coding agents, packaged for repository-scoped or marketplace
 installation.
 
-It is one loop. A task list is **grilled** into a design, the design becomes a **plan file** in an
-ordered index, an agent **drains** that index batch by batch until nothing is actionable, and a
-periodic **hygiene** sweep keeps every fact in exactly one place. The skills here are the entry
-points to each stage.
+The skills support research, design interviews, recorded plans, ordered execution, and
+documentation maintenance. Use the entrypoint that matches the requested work.
 
 ## Skills
 
@@ -25,8 +23,8 @@ points to each stage.
 | `improve-codebase-architecture` | explicit | Finds deepening opportunities, reports them, then grills the selected one. |
 | `wait-what` | explicit | Re-pitches an explanation that did not land. |
 
-The source for all twelve skills is this one `skills/` tree. Repository installs link to it; they do
-not make additional physical skill copies.
+All twelve skills share this `skills/` source tree. Repository installs expose them through
+relative links.
 
 ## Invocation policy
 
@@ -55,16 +53,14 @@ does not authorize unrelated work or additional external actions.
 
 ## Host repository assumptions
 
-The skills reference these conventional files and describe setup instead of editing when they are
-absent:
+Planning and domain workflows use the repository's adopted files:
 
 - `docs/plans/README.md` — ordered execution index and ownership rules.
 - `docs/plans/TODO.md`, `docs/plans/RELEASE.md`, `docs/plans/BLOCKERS.md` — live coordination.
 - `docs/adr/README.md` — decision index.
 - `CONTEXT.md` — ubiquitous language.
 
-Nothing here names a build tool, programming language, product, deployment target, machine path, or
-personal identifier. Project-specific procedure belongs in the consuming repository's real skill
+Project-specific commands and procedures belong in the consuming repository's real skill
 directories, whether directly installed or exposed through a setup-owned catalog.
 
 ## Installation
@@ -74,7 +70,7 @@ Use the catalog's
 installation, or follow the catalog [README](https://github.com/sergkhl/agent-workflow-plugins) for a personal marketplace install.
 Do not enable both copies in the same working context.
 
-Repository installation is always explicit. This plugin has no hook that mutates a consumer.
+Repository installation is an explicit operation managed by the installer.
 
 ## License and provenance
 
@@ -90,5 +86,4 @@ and useful routing in the entrypoint; load detailed procedures only for the rele
 Preserve named opt-in gates, user intent, meaningful completion criteria, and operational
 boundaries. Prefer scoped evidence over mandatory reading itineraries or repeated passing tests.
 These conventions follow [OpenAI's skills and prompts guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)
-and remain useful across models. Validate metadata, references, and realistic task decisions;
-smaller files alone do not establish better behavior.
+and remain useful across models. Validate metadata, references, and realistic task decisions.

@@ -13,5 +13,4 @@ meaningful complexity and concentrates changes and tests.
 - For a coupled cluster and its dependencies, consult [DEEPENING.md](DEEPENING.md).
 - For requested alternative interfaces, consult [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md).
 
-Choose the reference that changes the current decision. These are design criteria, not a mandate
-to redesign neighboring modules or impose a vocabulary on unrelated work.
+Read the reference relevant to the current design question.

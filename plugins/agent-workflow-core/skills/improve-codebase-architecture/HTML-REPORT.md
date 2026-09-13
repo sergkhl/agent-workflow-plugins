@@ -7,7 +7,7 @@ available rendering tools.
 
 ## Scaffold
 
-This is an optional starting point, not a required visual recipe:
+Optional HTML starting point:
 
 ```html
 <!doctype html>
@@ -42,14 +42,14 @@ Give each candidate an anchor so the recommendation can link to it. Include:
 - A proposed interface or responsibility change and a before/after visual that explains it.
 - Concrete benefits, relevant costs, confidence in the recommendation, and substantive ADR conflicts.
 
-Use enough prose to explain the evidence and tradeoff. Avoid arbitrary sentence limits, required
-badge colors, or a fixed number of candidates. Make uncertainty visible where it affects the choice.
+Match the detail and number of candidates to the findings. Explain the evidence, tradeoffs, and
+uncertainty that affect the choice.
 
 ## Diagram patterns
 
 Choose a visual that exposes the relevant relationship: a dependency graph for call flow, a
 cross-section for redundant layers, or an interface/implementation comparison for module depth.
-Use consistent notation across comparable candidates. Decorative variety is optional.
+Use consistent notation across comparable candidates.
 
 Mermaid is useful for graphs when a renderer is available; embed the rendered result for an offline
 artifact. Inline SVG or simple HTML works for boxes and annotated comparisons. Explain symbolic

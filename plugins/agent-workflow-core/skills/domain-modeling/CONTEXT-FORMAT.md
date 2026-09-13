@@ -5,28 +5,25 @@
 ```md
 # {Context Name}
 
-{One or two sentence description of what this context is and why it exists.}
+{Brief description of what this context is and why it exists.}
 
 ## Language
 
 **Order**:
-{A one or two sentence description of the term}
-_Avoid_: Purchase, transaction
+{The term's domain meaning and any distinction needed to use it correctly.}
 
 **Invoice**:
 A request for payment sent to a customer after delivery.
-_Avoid_: Bill, payment request
 
 **Customer**:
 A person or organization that places orders.
-_Avoid_: Client, buyer, account
 ```
 
 ## Rules
 
-- **Be opinionated.** When multiple words exist for the same concept, pick the best one and list the others under `_Avoid_`.
-- **Keep definitions tight.** One or two sentences max. Define what it IS, not what it does.
-- **Only include terms specific to this project's context.** General programming concepts (timeouts, error types, utility patterns) don't belong even if the project uses them extensively. Before adding a term, ask: is this a concept unique to this context, or a general programming concept? Only the former belongs.
+- **Use established vocabulary.** Clarify ambiguous or legacy alternatives when the distinction matters locally.
+- **Keep definitions concise.** State the domain meaning and include the qualifications needed to distinguish related concepts.
+- **Document domain terms whose meaning matters in this context.** Put implementation details in their technical documentation or ADR.
 - **Group terms under subheadings** when natural clusters emerge. If all terms belong to a single cohesive area, a flat list is fine.
 
 ## Single vs multi-context repos

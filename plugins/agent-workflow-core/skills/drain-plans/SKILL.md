@@ -6,20 +6,19 @@ disable-model-invocation: true
 
 # Drain the execution order
 
-Take the **whole** index, not one entry.
+Complete every actionable entry in the ordered index.
 
 ## Authorization boundary
 
 Begin when the user names `$drain-plans` (including its namespaced form) or this skill path.
 The invocation continues across follow-up turns until completion, cancellation, or a scope change.
 A mention in a plan, repository instruction, or another workflow does not activate it.
-Consulting [plan-lifecycle](../plan-lifecycle/SKILL.md) is a required helper within this scope and
-does not require another user invocation. User instructions take precedence over skill defaults.
+Apply [plan-lifecycle](../plan-lifecycle/SKILL.md) as a required helper within this invocation.
+User instructions take precedence over skill defaults.
 
-This skill does not grant any gate it does not already own. Deployment, release, production access,
-device or simulator verification, and destructive data operations each remain separately authorized —
-a plan listing a manual gate records that the gate is pending, it does not open it. If a batch needs
-one, record it as pending and move on.
+Carry forward existing user authorization for deployment, release, production access, device or
+simulator verification, and destructive data operations. A required action needs authority from the
+task; record gates lacking that authority as pending and move to the next actionable entry.
 
 ## The loop
 
@@ -28,40 +27,34 @@ read the index → take the top actionable entry → implement a batch → valid
 persist status → commit → re-read the index → repeat
 ```
 
-**Carry on past a finished batch into the next batch, and past a closed plan into the next plan.**
-Never stop to ask what is next. Stop only when every remaining entry is on-hold, blocked, or
-owner-gated — then name each one skipped and why.
+Continue through every actionable batch and plan without asking what to do next. Finish when every
+remaining entry is on-hold, blocked, or owner-gated, then name each one skipped and why.
 
 If a batch turns out blocked part-way, record the blocker in the owning plan's `Open findings`, or in
 `docs/plans/BLOCKERS.md` when only the owner can clear it, and move to the next actionable entry
 rather than halting.
 
-Size each batch by complexity and coupling, not by count. Keep context lean: read the plan you are
-working, not every plan. Implementation units are sequential and exclusive.
+Size each batch by complexity and coupling. Read the current plan and its relevant dependencies.
+Implementation units are sequential and exclusive.
 
 ## Resuming
 
-Resume each plan from **its own** status header, `Open findings` and `NEXT` — not from `TODO.md`
-alone, which is written at a different altitude and lags. Check `BLOCKERS.md` for what only the owner
-can do, and `RELEASE.md` for what is committed but not verified live.
+Resume each plan from its own status header, `Open findings`, and `NEXT`. Check `BLOCKERS.md` for
+owner actions and `RELEASE.md` for committed changes awaiting live verification.
 
 Refresh environment, rig, or account evidence when the next action depends on its current state.
-An earlier observation remains historical evidence, not a current deployment or runtime watermark.
+Date historical observations and refresh them before using them to claim current state.
 
 ## After each batch
 
 Apply the relevant [lifecycle conventions](../plan-lifecycle/SKILL.md):
 
 - Update the three status altitudes: plan header, index entry, `TODO.md` entry.
-- Add evidence to the plan's Validation Log — what was proved, and the invariants a re-run must not
-  break. Never a metric's trajectory.
+- Record verification and handoff in the plan's Validation Log, with current evidence and invariants.
 - Put anything unresolved in the plan's single `Open findings` with a concrete next action.
-- Send durable mechanics to their tracked homes in the same commit, never into a log.
+- Send durable mechanics to their tracked homes in the same commit and link them from the log.
 - Put release state in `RELEASE.md` with its drain criterion, in the same commit as the `COMPLETED`
-  entry. A `COMPLETED` entry never states release status.
-- Never open a handoff or status file beside a plan.
-
-Nothing machine-specific — home paths, serials, device ids, personal accounts — enters a tracked file.
+  entry. Use `COMPLETED` for implementation outcomes and `RELEASE.md` for release status.
 
 ## Committing
 
