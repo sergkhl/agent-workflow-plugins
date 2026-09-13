@@ -1,0 +1,4 @@
+interface:
+  display_name: "Research"
+  short_description: "Investigate primary sources and retain findings"
+  default_prompt: "Use $research to investigate this question and save concise findings with primary-source citations."

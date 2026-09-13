@@ -12,7 +12,8 @@ points to each stage.
 
 | Skill | Invocation | What it does |
 |---|---|---|
-| `plan-lifecycle` | explicit | Defines the plan index, `TODO`/`RELEASE`/`BLOCKERS`, ownership rules, closure test, and Validation Log retention. |
+| `research` | model | Investigates primary sources and saves concise, cited findings using repository conventions. |
+| `plan-lifecycle` | model | Applies the adopted plan index, `TODO`/`RELEASE`/`BLOCKERS`, ownership rules, closure test, and Validation Log retention to current plan work. |
 | `plan-from-tasks` | explicit | Turns a task list into a new plan after answering what it can from the repository and grilling the remaining decisions. |
 | `drain-plans` | explicit | Repeats batch, validation, status persistence, commit, and re-read until nothing is actionable. |
 | `docs-hygiene` | explicit | Enforces one canonical definition per concept and Keep/Simplify/Merge/Defer/Remove traceability. |
@@ -24,19 +25,18 @@ points to each stage.
 | `improve-codebase-architecture` | explicit | Finds deepening opportunities, reports them, then grills the selected one. |
 | `wait-what` | explicit | Re-pitches an explanation that did not land. |
 
-The source for all eleven skills is this one `skills/` tree. Repository installs link to it; they do
+The source for all twelve skills is this one `skills/` tree. Repository installs link to it; they do
 not make additional physical skill copies.
 
 ## Invocation policy
 
-Eight skills are explicit-only:
+Seven skills are explicit-only:
 
 - `docs-hygiene`
 - `drain-plans`
 - `grill-with-docs`
 - `improve-codebase-architecture`
 - `plan-from-tasks`
-- `plan-lifecycle`
 - `wait-what`
 - `worklog`
 
@@ -45,10 +45,13 @@ Each carries both harness gates:
 - `disable-model-invocation: true` in `SKILL.md` for Claude.
 - `policy.allow_implicit_invocation: false` in `agents/openai.yaml` for Codex.
 
-The three model-invocable skills are `codebase-design`, `domain-modeling`, and `grilling`. A gated
-skill's default prompt names the skill explicitly. Named invocations persist within the active task;
-documented helpers may be consulted within that scope. Repository references do not activate a
-workflow or authorize additional external actions.
+The five model-invocable skills are `codebase-design`, `domain-modeling`, `grilling`, `plan-lifecycle`,
+and `research`. Plan lifecycle selection applies to creating, registering, updating, or closing
+plans in an adopted workflow; reading a plan alone does not initiate maintenance.
+
+A gated skill's default prompt names the skill explicitly. Named invocations persist within the
+active task; documented helpers may be consulted within that scope. A repository reference alone
+does not authorize unrelated work or additional external actions.
 
 ## Host repository assumptions
 
@@ -76,7 +79,7 @@ Repository installation is always explicit. This plugin has no hook that mutates
 ## License and provenance
 
 Original work is MIT licensed. `grilling`, `grill-with-docs`, `domain-modeling`, `codebase-design`,
-`improve-codebase-architecture`, and `wait-what` were derived from
+`improve-codebase-architecture`, `research`, and `wait-what` were derived from
 [`mattpocock/skills`](https://github.com/mattpocock/skills) and have since diverged. The complete
 upstream MIT notice is in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 

@@ -8,6 +8,7 @@ The following `agent-workflow-core` skills were derived from
 - `grill-with-docs`
 - `grilling`
 - `improve-codebase-architecture`
+- `research`
 - `wait-what`
 
 The complete upstream notice follows.

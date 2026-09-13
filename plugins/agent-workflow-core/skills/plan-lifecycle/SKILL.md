@@ -1,15 +1,13 @@
 ---
 name: plan-lifecycle
-description: Use $plan-lifecycle to apply the adopted plan index, status ownership, closure, and retention conventions.
-disable-model-invocation: true
+description: Apply an adopted plan workflow when creating, registering, updating, or closing plans.
 ---
 
 # Plan lifecycle
 
-Begin standalone lifecycle work only when the user names `$plan-lifecycle` (including its
-namespaced form) or this skill path. The invocation persists through the same task's follow-ups.
-`plan-from-tasks` and `drain-plans` may consult these conventions as documented helpers after their
-own explicit invocation. Merely reading a plan does not authorize a lifecycle sweep.
+Use these conventions for the current task's plan creation, registration, progress updates, or
+closure in a repository that has adopted this workflow. Reading a plan alone does not trigger a
+maintenance sweep. Keep lifecycle actions within the user's scope and the host's mode.
 
 Use the relevant sections of [conventions](references/conventions.md):
 
