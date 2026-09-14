@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # From tasks to a plan
 
-Deliver one decision-complete plan in the repository's adopted ordered index. This workflow ends
+Deliver one decision-complete plan in the repository's adopted plan index. This workflow ends
 with the plan and its registration committed; implementation requires an implementation request.
 
 ## Invocation and scope
@@ -40,9 +40,10 @@ These two helper skills are authorized within this planning task; they do not ac
 Write `docs/plans/YYYY-MM-DD-<short-kebab-summary>.md` with a compact status header, problem,
 outcome, requirements, design and meaningful alternatives, ordered units with acceptance criteria,
 an empty Validation Log, and `Open findings: _None._`. Link existing policy instead of copying it.
-Place retention guidance beside the log and record its last meaningful update date. Register the
-plan in the execution index and `TODO.md`; keep owner-required actions in the owning task. Use a
-separate blocker file only when the repository explicitly retains it. Respect user-specified ordering.
+Place retention guidance beside the log and record its last meaningful update date. Register an
+active plan in the execution order and `TODO.md`; a held plan belongs only in the index's On Hold
+section, with its next action and resume condition in the owning plan. Keep owner-required actions
+in the owning task, following any explicit repository override. Respect user-specified ordering and holds.
 
 Report the resulting plan, its commit, and remaining decisions or gates. Do not stop at an
 unregistered draft when registration is part of the authorized request.

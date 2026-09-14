@@ -9,12 +9,16 @@ plans. Explicit repository policy overrides these defaults; reading a plan does 
 |---|---|---|
 | `docs/plans/README.md` | Ordered active work and a separate On Hold section. | Index every retained plan as active or held. |
 | `docs/plans/TODO.md` | `TODO` for active workstreams, `COMPLETED` outcomes, `VALIDATION` for active plan-less work. | At most 10 active workstreams; zero is valid. |
-| `docs/plans/RELEASE.md` | Pending delivery or live verification, grouped by shipping surface. | `_None._` when settled. |
+| `docs/plans/RELEASE.md` | Pending delivery or live verification, grouped by shipping surface. | Aim for at most 90 lines; `_None._` when settled. |
 
-Owner actions belong to the owning plan or plan-less task. A repository may explicitly retain a
-separate blocker file; never create or recreate one just because it is absent. Keep held work out
-of TODO and the execution order. Task-less holds live in the index with a next action and resume
-condition, not in a replacement backlog document.
+Owner actions belong to the owning plan or plan-less task. TODO owns active work without a plan;
+the index owns plan-less holds with a next action and resume condition. Keep held work out of TODO
+and the execution order. A repository may explicitly retain a separate blocker file; never create
+or recreate one just because it is absent, or introduce a replacement backlog document.
+
+Updating the plugin does not migrate repository documents. When a migration is requested, move
+outstanding actions to their owning active or held tasks and preserve the records before deleting
+the old tracker under the [closure rules](#closing-a-plan).
 
 ## Choosing and updating a task
 
@@ -85,8 +89,11 @@ coordination, unless a repository explicitly chooses another trigger. Do not add
 ## Release state
 
 RELEASE holds delivery actions and short live drain criteria, grouped only when they share a
-shipping action and evidence. Link procedures rather than repeating journeys. Deployment and
-behavior are separate evidence; current live claims require authoritative current reads.
+shipping action and evidence. Preserve delivery prerequisites, migration order, and artifact/runtime
+compatibility constraints when consolidating entries. Link procedures rather than repeating journeys.
+Deployment and behavior are separate evidence; current live claims require authoritative current
+reads. Recorded delivery dates establish historical age, not a current live watermark. Unknown
+delivery stays pending in RELEASE without creating a duplicate acceptance task in TODO.
 
 A release operator removes entries proved during an authorized deployment or reconciliation.
 Manual hygiene may also remove owner-confirmed or age-retired entries under the policy above.

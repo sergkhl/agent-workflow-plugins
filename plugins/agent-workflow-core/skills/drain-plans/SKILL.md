@@ -49,10 +49,11 @@ Date historical observations and refresh them before using them to claim current
 
 Apply the relevant [lifecycle conventions](../plan-lifecycle/SKILL.md):
 
-- Update the owning task's status and meaningful-update date; keep index/TODO summaries consistent
-  without copying acceptance or owner-action details into them.
-- Record verification and handoff in the plan's Validation Log, with current evidence and invariants.
-- Put anything unresolved in the plan's single `Open findings` with a concrete next action.
+- Update task status and index/TODO summaries, keeping detailed checklists in the owning task.
+  Advance its date only for a [meaningful update](../plan-lifecycle/references/conventions.md#choosing-and-updating-a-task).
+- Record verification and handoff in the plan's Validation Log, or TODO's VALIDATION for active
+  work without a plan, with current evidence and invariants.
+- Keep unresolved findings and a concrete next action in the owning task.
 - Send durable mechanics to their tracked homes in the same commit and link them from the log.
 - Put release state in `RELEASE.md` with its drain criterion, in the same commit as the `COMPLETED`
   entry. Use `COMPLETED` for implementation outcomes and `RELEASE.md` for release status.

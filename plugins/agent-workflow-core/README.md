@@ -63,7 +63,8 @@ Planning and domain workflows use the repository's adopted files:
 Owner actions live in the owning task. A repository may explicitly retain a separate blocker file;
 its absence never calls for recreating one. The [lifecycle defaults](skills/plan-lifecycle/references/conventions.md)
 allow zero active workstreams and retire delivered work after more than seven days during manual
-documentation hygiene. Explicit repository policies override these defaults.
+documentation hygiene. Explicit repository policies override these defaults; upgrading the plugin
+does not migrate repository documents.
 
 Project-specific commands and procedures belong in the consuming repository's real skill
 directories, whether directly installed or exposed through a setup-owned catalog.

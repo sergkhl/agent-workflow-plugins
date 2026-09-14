@@ -16,8 +16,8 @@ Continue that invocation through follow-up turns until completion, cancellation,
 A repository mention does not activate a sweep. Apply it to the requested documentation set;
 a repository-wide sweep requires that scope.
 
-Preserve every document in Git before deleting it. Commit uncommitted content first, then delete it
-in a later commit so the original remains retrievable.
+Preserve every document in Git before consolidating or deleting it. Commit uncommitted content
+first, then consolidate or delete it in a later commit so the original remains retrievable.
 
 ## What to read
 
@@ -42,9 +42,9 @@ have **exactly one** canonical definition. For every duplicated or overlapping s
 Consolidate into the canonical location and replace repeated explanations with links. Surface
 substantive conflicts; ask the owner when authority or intended behaviour remains unresolved.
 
-The usual ownership split: an ADR owns durable policy and its reasoning; the repository instruction
-file owns day-to-day mechanics; source types and the initial migration own persisted shapes; plans own
-implementation sequencing. Each links to the others rather than restating them.
+The usual ownership split: ADRs own durable policy and reasoning; repository instructions and
+maintained runbooks own operational mechanics; source types and migrations own implemented
+interfaces and persisted shapes; plans own design and acceptance. Link rather than restating.
 
 ## Current value
 
@@ -60,7 +60,7 @@ over-designed), **Merge** (duplicates another responsibility or section), **Defe
 value, not currently justified), or **Remove** (obsolete, contradictory, or low-value).
 
 Keep material that serves a current purpose, simplify or remove obsolete material, and record
-unresolved decisions as open questions in the owning plan or `TODO` entry.
+unresolved decisions in the owning task: a plan, an active TODO entry, or a held index entry.
 
 ## Inventories and evidence
 

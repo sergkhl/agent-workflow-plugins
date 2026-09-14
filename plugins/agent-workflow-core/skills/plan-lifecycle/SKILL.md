@@ -18,5 +18,5 @@ Use the relevant sections of [conventions](references/conventions.md):
 - Adopting the workflow: setup in a new repository, only when the user requests adoption.
 
 The plan owns design and acceptance while active; Git history preserves completed plans. Release
-state belongs to the release manifest; administrative retirement does not prove behavior. Neither convention grants
-production access, deployment, device verification, or destructive-operation authority.
+state belongs to the release manifest; administrative retirement does not prove behavior. Neither
+convention grants production access, deployment, device verification, or destructive-operation authority.
