@@ -11,10 +11,10 @@ documentation maintenance. Use the entrypoint that matches the requested work.
 | Skill | Invocation | What it does |
 |---|---|---|
 | `research` | model | Investigates primary sources and saves concise, cited findings using repository conventions. |
-| `plan-lifecycle` | model | Applies the adopted plan index, `TODO`/`RELEASE`/`BLOCKERS`, ownership rules, closure test, and Validation Log retention to current plan work. |
+| `plan-lifecycle` | model | Applies the adopted index, `TODO`/`RELEASE`, task-owned actions, closure rules, and evidence retention. |
 | `plan-from-tasks` | explicit | Turns a task list into a new plan after answering what it can from the repository and grilling the remaining decisions. |
 | `drain-plans` | explicit | Repeats batch, validation, status persistence, commit, and re-read until nothing is actionable. |
-| `docs-hygiene` | explicit | Enforces one canonical definition per concept and Keep/Simplify/Merge/Defer/Remove traceability. |
+| `docs-hygiene` | explicit | Consolidates canonical documentation; retires eligible delivered work and proposes holds for inactive tasks. |
 | `worklog` | explicit | Estimates hands-on effort per day from commit authorship and emits a CSV. |
 | `grilling` | model | Interviews the user to settle consequential decisions and constraints. |
 | `grill-with-docs` | explicit | Combines `grilling` with `domain-modeling` so ADRs and glossary entries result from the interview. |
@@ -55,10 +55,15 @@ does not authorize unrelated work or additional external actions.
 
 Planning and domain workflows use the repository's adopted files:
 
-- `docs/plans/README.md` — ordered execution index and ownership rules.
-- `docs/plans/TODO.md`, `docs/plans/RELEASE.md`, `docs/plans/BLOCKERS.md` — live coordination.
+- `docs/plans/README.md` — ordered execution index and a separate hold section.
+- `docs/plans/TODO.md`, `docs/plans/RELEASE.md` — active work and pending delivery/verification.
 - `docs/adr/README.md` — decision index.
 - `CONTEXT.md` — ubiquitous language.
+
+Owner actions live in the owning task. A repository may explicitly retain a separate blocker file;
+its absence never calls for recreating one. The [lifecycle defaults](skills/plan-lifecycle/references/conventions.md)
+allow zero active workstreams and retire delivered work after more than seven days during manual
+documentation hygiene. Explicit repository policies override these defaults.
 
 Project-specific commands and procedures belong in the consuming repository's real skill
 directories, whether directly installed or exposed through a setup-owned catalog.

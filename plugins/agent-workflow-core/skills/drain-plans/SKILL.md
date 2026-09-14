@@ -30,17 +30,17 @@ persist status → commit → re-read the index → repeat
 Continue through every actionable batch and plan without asking what to do next. Finish when every
 remaining entry is on-hold, blocked, or owner-gated, then name each one skipped and why.
 
-If a batch turns out blocked part-way, record the blocker in the owning plan's `Open findings`, or in
-`docs/plans/BLOCKERS.md` when only the owner can clear it, and move to the next actionable entry
-rather than halting.
+If a batch turns out blocked part-way, record the action needed in the owning plan's `Open findings`
+or the plan-less task, including owner-required actions, and move to the next actionable entry.
+Use a separate blocker file only when the repository explicitly retains that convention.
 
 Size each batch by complexity and coupling. Read the current plan and its relevant dependencies.
 Implementation units are sequential and exclusive.
 
 ## Resuming
 
-Resume each plan from its own status header, `Open findings`, and `NEXT`. Check `BLOCKERS.md` for
-owner actions and `RELEASE.md` for committed changes awaiting live verification.
+Resume each plan from its own status header, `Open findings`, and `NEXT`, including its owner actions.
+Check `RELEASE.md` for pending delivery and verification; held work needs explicit scope restoration.
 
 Refresh environment, rig, or account evidence when the next action depends on its current state.
 Date historical observations and refresh them before using them to claim current state.
@@ -49,7 +49,8 @@ Date historical observations and refresh them before using them to claim current
 
 Apply the relevant [lifecycle conventions](../plan-lifecycle/SKILL.md):
 
-- Update the three status altitudes: plan header, index entry, `TODO.md` entry.
+- Update the owning task's status and meaningful-update date; keep index/TODO summaries consistent
+  without copying acceptance or owner-action details into them.
 - Record verification and handoff in the plan's Validation Log, with current evidence and invariants.
 - Put anything unresolved in the plan's single `Open findings` with a concrete next action.
 - Send durable mechanics to their tracked homes in the same commit and link them from the log.

@@ -24,6 +24,11 @@ in a later commit so the original remains retrievable.
 Start with the requested documents and their actual consumers. Follow links to the relevant
 glossary, ADRs, plans, or runbooks when ownership or consistency depends on them.
 
+When the requested set includes planning or release coordination, apply the repository's explicit
+policy or the [lifecycle defaults](../plan-lifecycle/references/conventions.md#manual-hygiene-and-age).
+Close eligible delivered work in this pass and propose holds for inactive unfinished tasks. This
+manual invocation is the trigger; do not add a scheduler or start implementing follow-up tasks.
+
 ## Canonical ownership
 
 Each architectural concept, decision, data model, interface contract, and implementation plan should
