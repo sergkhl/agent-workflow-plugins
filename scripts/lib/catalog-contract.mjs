@@ -306,6 +306,32 @@ export const RELEASE_INVENTORY = {
       'worklog',
     ],
   },
+  // 0.7.1 defaults omitted worklog inputs while preserving the skill inventory and invocation gates.
+  '0.7.1': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'research',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'wait-what',
+      'worklog',
+    ],
+  },
 }
 
 export function readJson(path) {

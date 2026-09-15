@@ -8,9 +8,8 @@ disable-model-invocation: true
 
 Produce a per-day estimate of **one person's actual working time** for a date range, as a CSV.
 
-Use inputs already supplied in the task; ask only for missing essentials: the date range, the author identity to attribute by, the
-reporting timezone, and where the file goes. Do not guess an identity from the git config — the person
-asking may not be the only author.
+Use inputs already supplied in the task. The start date is the only normally required input;
+resolve omitted inputs with the defaults below and continue without requesting confirmation.
 
 **Hands-on hours are a timesheet number, not a measure of delivered scope.** Never report
 scope-equivalent or conventional-equivalent hours anywhere in the output. When the user works with
@@ -24,10 +23,37 @@ Continue the same invocation through follow-ups until completion, cancellation, 
 did that take" and "how much have I done this week" are questions to answer in prose, not triggers
 for this skill.
 
-The output attributes a **named person's** commits and states hours someone may invoice against. Do
-not infer whose commits to read, and do not run this over a shared repository's history on your own
-initiative — ask for the identity, as the section below requires, and let the person asking decide
-that the estimate should exist at all.
+The output attributes a **named person's** commits and states hours someone may invoice against.
+Within an explicit invocation, use the supplied author or the current Git author default below.
+Do not initiate an estimate over a shared repository's history without that invocation.
+
+## Inputs and defaults
+
+Explicit task inputs override defaults. Resolve the repository and reporting timezone before the
+author and dates; interpret relative dates and compute today's calendar date in that timezone.
+
+| Input | Default when omitted |
+|---|---|
+| Start date | Ask for it. A supplied date range or unambiguous relative period already supplies it. |
+| End date | Today's calendar date in the reporting timezone. Include both range endpoints. |
+| Repository | The current Git repository. |
+| Author | The effective configured Git author name and email in the target repository, respecting author environment overrides and repository/global configuration. |
+| Timezone | The current user's timezone from task context; otherwise discover the local system timezone. Use its historical timezone rules, including daylight-saving changes, throughout the range. |
+| InvoiceId | `INV-YYYY-MM-DD`, using the resolved end date for every row. A supplied ID or convention overrides this. |
+| Output directory | A `worklogs/` subdirectory of the repository's documented ignored artifacts directory; otherwise `worklogs/` under the system temporary directory. |
+| Filename | `worklog-<repository>-<author>-<start>-<end>.csv`, using filesystem-safe names and `YYYY-MM-DD` dates. Add a numeric suffix if the generated path already exists. |
+| Report language | English summaries and weekday names, unless the user or repository specifies another reporting language. |
+
+Read the default author in the target repository, for example with
+`git -c user.useConfigOnly=true var GIT_AUTHOR_IDENT`; use its name and email, not its timestamp.
+Do not fall back to a synthesized login/hostname identity. Attribute by exact author email; do not
+expand to other contributors because their names are similar. If a supplied author is ambiguous,
+ask for clarification. If no commits match, keep one zero-hour row per requested day and the
+selected author.
+
+Ask only for a missing start date, invalid or ambiguous supplied values (including an end before
+the start), or a default that cannot be resolved reliably. Use an existing documented artifact
+location only when it is ignored; do not change repository ignore rules to save the report.
 
 ## Method
 
@@ -36,7 +62,8 @@ that the estimate should exist at all.
   which destroys the daily distribution.
 - Include unmerged feature branches. Deduplicate rebased copies with `git patch-id`, never by commit
   subject — a rebase preserves the subject.
-- Put the workday boundary at 04:00 so past-midnight work counts toward the previous day.
+- Put the workday boundary at 04:00 in the reporting timezone so past-midnight work counts toward
+  the previous day. This changes workday attribution, not the default end date of today.
 - Report days with no commits as `0`. Do not spread work into them.
 
 ## Estimating the number
@@ -65,8 +92,11 @@ Date,InvoiceId,Day,Summary,Estimated Hands-on h
 
 - One row per calendar day in the range, including zero days, in date order.
 - `Date`: `YYYY-MM-DD`. `Day`: weekday name.
-- `InvoiceId`: as the user defines it; if they use a period-ending date, derive it from the range
-  rather than hardcoding one.
+- `InvoiceId`: the resolved ID or convention from Inputs and defaults. Derive period-ending IDs
+  from the resolved end date rather than hardcoding one.
 - `Summary`: what was actually worked on that day, as one quoted field. Commas allowed inside the
   quotes, no line breaks. Empty `""` for zero days.
 - `Estimated Hands-on h`: a number to one decimal place, no unit suffix.
+
+Alongside the CSV, report the resolved repository, author name and email, date range, timezone,
+invoice ID, and output path. These are informational settings, not a confirmation gate.
