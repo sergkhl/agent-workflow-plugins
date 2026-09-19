@@ -332,6 +332,33 @@ export const RELEASE_INVENTORY = {
       'worklog',
     ],
   },
+  // 0.8.0 adds global personal Claude installation and a strict Claude marketplace; the skill
+  // inventory and invocation gates are unchanged.
+  '0.8.0': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'research',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'wait-what',
+      'worklog',
+    ],
+  },
 }
 
 export function readJson(path) {
@@ -520,24 +547,27 @@ export function validateCatalog(catalogRoot, { pluginId = PLUGIN_ID, releaseTag 
     }
   }
 
-  const marketplaces = [
-    readJson(resolve(root, '.agents', 'plugins', 'marketplace.json')),
-    readJson(resolve(root, '.claude-plugin', 'marketplace.json')),
-  ]
-  for (const marketplace of marketplaces) {
+  const codexMarketplace = readJson(resolve(root, '.agents', 'plugins', 'marketplace.json'))
+  const claudeMarketplace = readJson(resolve(root, '.claude-plugin', 'marketplace.json'))
+  for (const marketplace of [codexMarketplace, claudeMarketplace]) {
     assert(marketplace.name === MARKETPLACE_ID, `Marketplace name must be ${MARKETPLACE_ID}`)
-    assert(marketplace.interface?.displayName === MARKETPLACE_DISPLAY_NAME,
-      `Marketplace display name must be ${MARKETPLACE_DISPLAY_NAME}`)
     assert(Array.isArray(marketplace.plugins) && marketplace.plugins.length === 1,
       'Each marketplace must expose exactly one initial plugin')
     const entry = marketplace.plugins[0]
     assert(entry.name === pluginId, `Marketplace plugin must be ${pluginId}`)
     assert(resolveMarketplaceSource(root, entry) === pluginRoot,
       `Marketplace source must resolve to ./plugins/${pluginId}`)
-    assert(entry.policy?.installation === 'AVAILABLE', 'Marketplace installation policy must be AVAILABLE')
-    assert(entry.policy?.authentication === 'ON_INSTALL', 'Marketplace authentication policy must be ON_INSTALL')
     assert(entry.category === 'Developer Tools', 'Marketplace category must be Developer Tools')
   }
+  // Display name and policies are Codex marketplace metadata. Releases through 0.7.1 also carry
+  // them in the Claude marketplace, so they are neither required nor rejected there; the catalog's
+  // own contract test keeps the current Claude marketplace strict.
+  assert(codexMarketplace.interface?.displayName === MARKETPLACE_DISPLAY_NAME,
+    `Codex marketplace display name must be ${MARKETPLACE_DISPLAY_NAME}`)
+  const codexEntry = codexMarketplace.plugins[0]
+  assert(codexEntry.policy?.installation === 'AVAILABLE', 'Codex marketplace installation policy must be AVAILABLE')
+  assert(codexEntry.policy?.authentication === 'ON_INSTALL',
+    'Codex marketplace authentication policy must be ON_INSTALL')
 
   if (releaseTag !== undefined) {
     assert(releaseTag === `${pluginId}--v${codex.version}`,

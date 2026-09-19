@@ -17,9 +17,10 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { homedir, tmpdir } from 'node:os'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { isDeepStrictEqual } from 'node:util'
 import { spawnSync } from 'node:child_process'
 import {
   CATALOG_REPOSITORY_URL,
@@ -31,17 +32,23 @@ import {
 } from './lib/catalog-contract.mjs'
 
 const LOCK_SCHEMA_VERSION = 1
-const CATALOG_LOCK_SCHEMA_VERSION = 2
+// Schema-2 locks declare their layout: a catalog root, or the global personal-skills layout.
+const LAYOUT_LOCK_SCHEMA_VERSION = 2
 const CLAUDE_LINK = { path: '.claude/skills', target: '../.agents/skills' }
+// A direct installation's lock is schema 1 and never records this layout.
+const DIRECT_LAYOUT = { type: 'direct' }
+const GLOBAL_LAYOUT = { type: 'global' }
 
 const usage = `Usage:
-  node scripts/install-repository.mjs --repo <root> --plugin agent-workflow-core --ref <tag> [--source <catalog>] --apply
-  node scripts/install-repository.mjs --repo <root> --plugin agent-workflow-core --check
-  node scripts/install-repository.mjs --repo <root> --plugin agent-workflow-core --ref <tag> [--source <catalog>] --update --apply
-  node scripts/install-repository.mjs --repo <root> --plugin agent-workflow-core --uninstall --apply
+  node scripts/install-repository.mjs (--repo <root> | --global) --plugin agent-workflow-core --ref <tag> [--source <catalog>] --apply
+  node scripts/install-repository.mjs (--repo <root> | --global) --plugin agent-workflow-core --check
+  node scripts/install-repository.mjs (--repo <root> | --global) --plugin agent-workflow-core --ref <tag> [--source <catalog>] --update --apply
+  node scripts/install-repository.mjs (--repo <root> | --global) --plugin agent-workflow-core --uninstall --apply
 
 Add --catalog-root <repo-relative-directory> to manage resources in a catalog whose
-setup owns agent discovery links. Supported by every operation.
+setup owns agent discovery links. Supported by every repository operation.
+Use --global instead of --repo to install personal Claude Code skills: one pinned
+snapshot under ~/.agents/plugins and one link per skill in ~/.claude/skills.
 Omit --apply from install, update, or uninstall to perform a read-only preflight.`
 
 function fail(message) {
@@ -169,7 +176,8 @@ function repositoryPaths(repositoryRoot, pluginId, catalogRoot) {
   }
   const resourceRoot = catalogRoot ?? '.agents'
   return {
-    repositoryRoot,
+    root: repositoryRoot,
+    layout: catalogRoot === undefined ? DIRECT_LAYOUT : { type: 'catalog', root: catalogRoot },
     catalogRoot,
     agents: resolve(repositoryRoot, resourceRoot),
     plugins: resolve(repositoryRoot, resourceRoot, 'plugins'),
@@ -180,41 +188,125 @@ function repositoryPaths(repositoryRoot, pluginId, catalogRoot) {
   }
 }
 
+// The global layout keeps the direct layout's vendor tree and lock under the home directory, but
+// links each skill into Claude Code's personal skills directory, which other skills share.
+function globalPaths(homeRoot, pluginId) {
+  return {
+    root: homeRoot,
+    layout: GLOBAL_LAYOUT,
+    catalogRoot: undefined,
+    agents: resolve(homeRoot, '.agents'),
+    plugins: resolve(homeRoot, '.agents', 'plugins'),
+    skills: resolve(homeRoot, '.claude', 'skills'),
+    vendor: resolve(homeRoot, '.agents', 'plugins', pluginId),
+    lock: resolve(homeRoot, '.agents', 'plugins', `${pluginId}.vendor.json`),
+    claude: null,
+  }
+}
+
+function resolveHomeRoot(input) {
+  // os.homedir() returns HOME verbatim, so an empty or relative value would target the working directory.
+  assert(typeof input === 'string' && isAbsolute(input),
+    `Global installation requires an absolute home directory; HOME resolves to "${input}"`)
+  assert(existsSync(input), `Home directory does not exist: ${input}`)
+  const path = realpathSync(input)
+  assert(lstatSync(path).isDirectory(), `Home directory is not a directory: ${path}`)
+  return path
+}
+
+function resolveInstallationPaths(options, pluginId, dependencies = {}) {
+  const repositoryRoot = options.repositoryRoot ?? options.repo
+  if (options.global !== true) {
+    assert(typeof repositoryRoot === 'string' && repositoryRoot.length > 0, '--repo <root> or --global is required')
+    return repositoryPaths(validateGitRoot(repositoryRoot, 'Consumer repository'), pluginId, options.catalogRoot)
+  }
+  assert(repositoryRoot === undefined && options.catalogRoot === undefined,
+    '--global cannot be combined with --repo or --catalog-root')
+  const paths = globalPaths(resolveHomeRoot(dependencies.homeRoot ?? homedir()), pluginId)
+  validateAnchors(paths)
+  // Claude Code creates its user directory privately; never create it with default permissions.
+  const claudeDirectory = dirname(paths.skills)
+  assert(pathType(claudeDirectory) === 'directory',
+    `Global installation requires an existing Claude Code user directory: ${claudeDirectory}. Start Claude Code once, then retry.`)
+  return paths
+}
+
+function assertDefaultClaudeConfig(paths, env) {
+  const configured = env.CLAUDE_CONFIG_DIR
+  if (configured === undefined || configured === '') return
+  const expected = realpathSync(dirname(paths.skills))
+  let actual = null
+  try {
+    actual = realpathSync(resolve(configured))
+  } catch {
+    // A directory that does not resolve is not the default one either.
+  }
+  assert(actual === expected,
+    `CLAUDE_CONFIG_DIR=${configured} makes Claude Code load personal skills from ${join(configured, 'skills')}, not ${paths.skills}. Global installation supports only the default ${expected}.`)
+}
+
 function ensureDirectoryOrMissing(path, label) {
   const type = pathType(path)
   assert(type === 'missing' || type === 'directory', `${label} must be a real directory; found ${type}: ${path}`)
 }
 
-function validateRepositoryAnchors(paths) {
-  // Check every ancestor, including missing ones; a symlink may not redirect a catalog write.
+function validateAnchors(paths) {
+  // Check every ancestor, including missing ones; a symlink may not redirect a managed write, and
+  // relative skill links would resolve against its target.
   for (const target of [paths.plugins, paths.skills, paths.claude].filter(Boolean)) {
-    for (let path = target; path !== paths.repositoryRoot; path = dirname(path)) {
-      ensurePathInside(paths.repositoryRoot, path)
-      ensureDirectoryOrMissing(path, relative(paths.repositoryRoot, path))
+    for (let path = target; path !== paths.root; path = dirname(path)) {
+      ensurePathInside(paths.root, path)
+      ensureDirectoryOrMissing(path, relative(paths.root, path))
     }
   }
 }
 
-function managedLinksForSkills(skills, pluginId = PLUGIN_ID, catalogRoot) {
-  const links = skills.map((name) => ({
-    path: `${catalogRoot ?? '.agents'}/skills/${name}`,
-    target: `../plugins/${pluginId}/skills/${name}`,
-  }))
-  if (catalogRoot === undefined) links.push(CLAUDE_LINK)
+function skillLinkRule(layout, pluginId) {
+  if (layout.type === 'global') {
+    return {
+      prefix: '.claude/skills/',
+      target: (name) => `../../.agents/plugins/${pluginId}/skills/${name}`,
+    }
+  }
+  return {
+    prefix: `${layout.type === 'catalog' ? layout.root : '.agents'}/skills/`,
+    target: (name) => `../plugins/${pluginId}/skills/${name}`,
+  }
+}
+
+function managedLinksForSkills(skills, pluginId, layout) {
+  const rule = skillLinkRule(layout, pluginId)
+  const links = skills.map((name) => {
+    // Claude Code keeps skills synced from claude.ai in ~/.claude/skills/synced.
+    assert(layout.type !== 'global' || name.toLowerCase() !== 'synced',
+      'Skill name "synced" is reserved by Claude Code under ~/.claude/skills')
+    return { path: `${rule.prefix}${name}`, target: rule.target(name) }
+  })
+  if (layout.type === 'direct') links.push(CLAUDE_LINK)
   return links.sort((left, right) => left.path.localeCompare(right.path, 'en'))
 }
 
+function describeLayout(layout) {
+  if (isDeepStrictEqual(layout, DIRECT_LAYOUT)) return 'a repository installation (--repo)'
+  if (isDeepStrictEqual(layout, GLOBAL_LAYOUT)) return 'a global installation (--global)'
+  if (layout?.type === 'catalog' && typeof layout.root === 'string' && Object.keys(layout).length === 2) {
+    return `a catalog installation (--catalog-root ${layout.root})`
+  }
+  return `an unrecognized layout ${JSON.stringify(layout)}`
+}
+
 function lockForSnapshot(snapshot, paths) {
+  const direct = paths.layout.type === 'direct'
   return {
-    schemaVersion: paths.catalogRoot === undefined ? LOCK_SCHEMA_VERSION : CATALOG_LOCK_SCHEMA_VERSION,
-    ...(paths.catalogRoot === undefined ? {} : { layout: { type: 'catalog', root: paths.catalogRoot } }),
+    schemaVersion: direct ? LOCK_SCHEMA_VERSION : LAYOUT_LOCK_SCHEMA_VERSION,
+    ...(direct ? {} : { layout: paths.layout }),
     repositoryUrl: CATALOG_REPOSITORY_URL,
     pluginId: snapshot.codex.name,
     releaseTag: snapshot.releaseTag,
     commitSha: snapshot.commitSha,
     pluginVersion: snapshot.version,
     contentDigest: snapshot.digest,
-    managedSymlinks: managedLinksForSkills(snapshot.skills, snapshot.codex.name, paths.catalogRoot),
+    managedSymlinks: managedLinksForSkills(snapshot.skills, snapshot.codex.name, paths.layout),
   }
 }
 
@@ -222,31 +314,36 @@ function stableJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`
 }
 
-function validateManagedLinkShape(link, pluginId, catalogRoot) {
+function validateManagedLinkShape(link, pluginId, layout) {
   assert(link && typeof link.path === 'string' && typeof link.target === 'string',
     'Every managedSymlinks entry must contain string path and target fields')
-  if (catalogRoot === undefined && link.path === CLAUDE_LINK.path) {
+  if (layout.type === 'direct' && link.path === CLAUDE_LINK.path) {
     assert(link.target === CLAUDE_LINK.target, '.claude/skills has an unexpected lock target')
     return
   }
-  const prefix = `${catalogRoot ?? '.agents'}/skills/`
-  const name = link.path.startsWith(prefix) ? link.path.slice(prefix.length) : ''
+  const rule = skillLinkRule(layout, pluginId)
+  const name = link.path.startsWith(rule.prefix) ? link.path.slice(rule.prefix.length) : ''
   assert(/^[a-z0-9-]+$/.test(name), `Unsafe managed symlink path in lock: ${link.path}`)
-  assert(link.target === `../plugins/${pluginId}/skills/${name}`,
+  assert(link.target === rule.target(name),
     `Unexpected managed symlink target in lock: ${link.path} -> ${link.target}`)
 }
 
 function validateLock(lock, pluginId, paths) {
   assert(lock && typeof lock === 'object' && !Array.isArray(lock), 'Vendor lock must be a JSON object')
-  assert([LOCK_SCHEMA_VERSION, CATALOG_LOCK_SCHEMA_VERSION].includes(lock.schemaVersion),
+  assert([LOCK_SCHEMA_VERSION, LAYOUT_LOCK_SCHEMA_VERSION].includes(lock.schemaVersion),
     `Unsupported vendor lock schema: ${lock.schemaVersion}`)
-  const isCatalog = lock.schemaVersion === CATALOG_LOCK_SCHEMA_VERSION
-  if (isCatalog) {
-    assert(paths.catalogRoot !== undefined && lock.layout?.type === 'catalog'
-      && lock.layout.root === paths.catalogRoot, 'Vendor lock catalog layout does not match --catalog-root')
-  } else {
+  if (lock.schemaVersion === LOCK_SCHEMA_VERSION) {
     assert(lock.layout === undefined, 'Legacy vendor lock must not declare a layout')
   }
+  // A schema-1 lock under a catalog root is a relocated direct snapshot. Verification checks its
+  // actual catalog links, and only --update --apply migrates the lock.
+  const legacyCatalog = paths.layout.type === 'catalog' && lock.schemaVersion === LOCK_SCHEMA_VERSION
+  if (!legacyCatalog) {
+    const recorded = lock.schemaVersion === LOCK_SCHEMA_VERSION ? DIRECT_LAYOUT : lock.layout
+    assert(isDeepStrictEqual(recorded, paths.layout),
+      `Vendor lock layout does not match this command: ${paths.lock} records ${describeLayout(recorded)}; this command manages ${describeLayout(paths.layout)}`)
+  }
+  const linkLayout = legacyCatalog ? DIRECT_LAYOUT : paths.layout
   assert(lock.repositoryUrl === CATALOG_REPOSITORY_URL, 'Vendor lock repository URL is not canonical')
   assert(lock.pluginId === pluginId, `Vendor lock plugin ID must be ${pluginId}`)
   assert(typeof lock.releaseTag === 'string', 'Vendor lock releaseTag is required')
@@ -256,15 +353,13 @@ function validateLock(lock, pluginId, paths) {
   assert(/^[0-9a-f]{40}$/.test(lock.commitSha), 'Vendor lock commitSha must be an exact 40-character SHA')
   assert(/^sha256:[0-9a-f]{64}$/.test(lock.contentDigest), 'Vendor lock contentDigest must be SHA-256')
   assert(Array.isArray(lock.managedSymlinks), 'Vendor lock managedSymlinks must be an array')
-  for (const link of lock.managedSymlinks) {
-    validateManagedLinkShape(link, pluginId, isCatalog ? paths.catalogRoot : undefined)
-  }
+  for (const link of lock.managedSymlinks) validateManagedLinkShape(link, pluginId, linkLayout)
   const sorted = [...lock.managedSymlinks].sort((left, right) => left.path.localeCompare(right.path, 'en'))
   assert(JSON.stringify(sorted) === JSON.stringify(lock.managedSymlinks),
     'Vendor lock managedSymlinks must be deterministic and sorted')
   assert(new Set(lock.managedSymlinks.map((link) => link.path)).size === lock.managedSymlinks.length,
     'Vendor lock contains duplicate managed symlink paths')
-  assert(isCatalog || lock.managedSymlinks.some((link) => link.path === CLAUDE_LINK.path),
+  assert(linkLayout.type !== 'direct' || lock.managedSymlinks.some((link) => link.path === CLAUDE_LINK.path),
     'Vendor lock must manage .claude/skills')
   return lock
 }
@@ -274,8 +369,8 @@ function readVendorLock(paths, pluginId) {
   return validateLock(readJson(paths.lock), pluginId, paths)
 }
 
-function assertExactSymlink(repositoryRoot, link, { mustResolve = false } = {}) {
-  const path = resolve(repositoryRoot, link.path)
+function assertExactSymlink(root, link, { mustResolve = false } = {}) {
+  const path = resolve(root, link.path)
   const type = pathType(path)
   assert(type === 'symlink', `${link.path} must be a symlink; found ${type}`)
   const actualTarget = readlinkSync(path)
@@ -290,8 +385,8 @@ function assertExactSymlink(repositoryRoot, link, { mustResolve = false } = {}) 
   }
 }
 
-function assertLinkAvailable(repositoryRoot, link) {
-  const path = resolve(repositoryRoot, link.path)
+function assertLinkAvailable(root, link) {
+  const path = resolve(root, link.path)
   const type = pathType(path)
   if (type === 'missing') return 'missing'
   if (type === 'symlink' && readlinkSync(path) === link.target) return 'exact'
@@ -299,10 +394,10 @@ function assertLinkAvailable(repositoryRoot, link) {
   fail(`${link.path} is occupied by ${detail}; expected ${link.target}. No changes were made.`)
 }
 
-function ensurePathInside(repositoryRoot, path) {
-  const rel = relative(repositoryRoot, path)
+function ensurePathInside(root, path) {
+  const rel = relative(root, path)
   assert(rel !== '' && rel !== '..' && !rel.startsWith(`..${sep}`),
-    `Refusing to mutate a path outside the consumer repository: ${path}`)
+    `Refusing to mutate a path outside the installation root: ${path}`)
 }
 
 function atomicWriteJson(path, value) {
@@ -333,10 +428,10 @@ function removeEmptyCreatedDirectories(createdDirectories) {
   }
 }
 
-export function defaultSymlinkProbe(repositoryRoot, createSymlink = symlinkSync) {
+export function defaultSymlinkProbe(root, createSymlink = symlinkSync) {
   let probeRoot
   try {
-    probeRoot = mkdtempSync(resolve(repositoryRoot, '.agent-workflow-symlink-probe-'))
+    probeRoot = mkdtempSync(resolve(root, '.agent-workflow-symlink-probe-'))
     const target = resolve(probeRoot, 'target')
     const link = resolve(probeRoot, 'link')
     mkdirSync(target)
@@ -345,8 +440,8 @@ export function defaultSymlinkProbe(repositoryRoot, createSymlink = symlinkSync)
   } catch (error) {
     const remediation = process.platform === 'win32'
       ? 'Enable Windows Developer Mode or grant Create symbolic links permission, then retry.'
-      : 'Grant symlink permission on the consumer filesystem, then retry.'
-    fail(`Repository installation requires real directory symlinks and never falls back to copies. ${remediation} (${error.message})`)
+      : 'Grant symlink permission on the installation filesystem, then retry.'
+    fail(`Installation requires real directory symlinks and never falls back to copies. ${remediation} (${error.message})`)
   } finally {
     if (probeRoot) rmSync(probeRoot, { recursive: true, force: true })
   }
@@ -359,19 +454,18 @@ function pluginManifestsAt(vendor) {
   }
 }
 
-export function verifyInstalledRepository(repositoryRootInput, pluginId = PLUGIN_ID, { catalogRoot } = {}) {
-  const repositoryRoot = validateGitRoot(repositoryRootInput, 'Consumer repository')
-  const paths = repositoryPaths(repositoryRoot, pluginId, catalogRoot)
-  validateRepositoryAnchors(paths)
+function verifyInstallation(paths, pluginId) {
+  validateAnchors(paths)
+  // Read the lock before the managed paths, so a lock written by another layout reports that conflict.
+  const lock = readVendorLock(paths, pluginId)
   assert(pathType(paths.skills) === 'directory', 'Skill root must be a real directory')
   assert(pathType(paths.vendor) === 'directory', `Missing vendored plugin: ${paths.vendor}`)
-  const lock = readVendorLock(paths, pluginId)
-  const legacyCatalog = catalogRoot !== undefined && lock.schemaVersion === LOCK_SCHEMA_VERSION
+  const legacyCatalog = paths.layout.type === 'catalog' && lock.schemaVersion === LOCK_SCHEMA_VERSION
   const managedLinks = legacyCatalog
     ? lock.managedSymlinks.filter((link) => link.path !== CLAUDE_LINK.path)
-      .map((link) => ({ ...link, path: link.path.replace(/^\.agents\//, `${catalogRoot}/`) }))
+      .map((link) => ({ ...link, path: link.path.replace(/^\.agents\//, `${paths.catalogRoot}/`) }))
     : lock.managedSymlinks
-  for (const link of managedLinks) assertExactSymlink(repositoryRoot, link, { mustResolve: true })
+  for (const link of managedLinks) assertExactSymlink(paths.root, link, { mustResolve: true })
   const actualDigest = computeContentDigest(paths.vendor)
   assert(actualDigest === lock.contentDigest,
     `Vendored plugin has local modifications: ${actualDigest} does not match ${lock.contentDigest}`)
@@ -390,18 +484,28 @@ export function verifyInstalledRepository(repositoryRootInput, pluginId = PLUGIN
     && JSON.stringify([...manifests.claude.skills].sort())
       === JSON.stringify(skills.map((name) => `./skills/${name}`).sort()),
   'Vendored Claude manifest skill inventory does not match the installed skills')
-  const expectedLinks = managedLinksForSkills(skills, pluginId, legacyCatalog ? undefined : catalogRoot)
+  const expectedLinks = managedLinksForSkills(skills, pluginId, legacyCatalog ? DIRECT_LAYOUT : paths.layout)
   assert(JSON.stringify(expectedLinks) === JSON.stringify(lock.managedSymlinks),
     'Vendor lock managed-link inventory does not match the vendored skill inventory')
 
   // Legacy catalog snapshots recorded generated discovery paths. Verify the actual catalog
   // links instead, then migrate only through --update --apply. Never touch preset-owned links.
-  return { repositoryRoot, paths, lock, managedLinks, legacyCatalog, manifests, skills, digest: actualDigest }
+  return { root: paths.root, paths, lock, managedLinks, legacyCatalog, manifests, skills, digest: actualDigest }
+}
+
+export function verifyInstalledRepository(repositoryRootInput, pluginId = PLUGIN_ID, { catalogRoot } = {}) {
+  const repositoryRoot = validateGitRoot(repositoryRootInput, 'Consumer repository')
+  return verifyInstallation(repositoryPaths(repositoryRoot, pluginId, catalogRoot), pluginId)
+}
+
+export function verifyGlobalInstallation(homeRootInput = homedir(), pluginId = PLUGIN_ID) {
+  const paths = resolveInstallationPaths({ global: true }, pluginId, { homeRoot: homeRootInput })
+  return verifyInstallation(paths, pluginId)
 }
 
 function stagePlugin(snapshot, paths) {
   const stage = resolve(paths.plugins, `.${snapshot.codex.name}.stage-${randomUUID()}`)
-  ensurePathInside(paths.repositoryRoot, stage)
+  ensurePathInside(paths.root, stage)
   try {
     cpSync(snapshot.pluginRoot, stage, { recursive: true, dereference: false, errorOnExist: true })
     assert(computeContentDigest(stage) === snapshot.digest, 'Staged plugin digest changed during copy')
@@ -412,14 +516,14 @@ function stagePlugin(snapshot, paths) {
   }
 }
 
-function preflightFreshInstall(repositoryRoot, paths, snapshot) {
-  validateRepositoryAnchors(paths)
+function preflightFreshInstall(root, paths, snapshot) {
+  validateAnchors(paths)
   const desiredLock = lockForSnapshot(snapshot, paths)
   const lockType = pathType(paths.lock)
 
   if (lockType !== 'missing') {
     assert(lockType === 'file', `Vendor lock path is occupied by ${lockType}: ${paths.lock}`)
-    const installed = verifyInstalledRepository(repositoryRoot, snapshot.codex.name, paths)
+    const installed = verifyInstallation(paths, snapshot.codex.name)
     const same = !installed.legacyCatalog && installed.lock.releaseTag === desiredLock.releaseTag
       && installed.lock.commitSha === desiredLock.commitSha
       && installed.lock.contentDigest === desiredLock.contentDigest
@@ -439,12 +543,12 @@ function preflightFreshInstall(repositoryRoot, paths, snapshot) {
 
   const missingLinks = []
   for (const link of desiredLock.managedSymlinks) {
-    if (assertLinkAvailable(repositoryRoot, link) === 'missing') missingLinks.push(link)
+    if (assertLinkAvailable(root, link) === 'missing') missingLinks.push(link)
   }
   return { desiredLock, alreadyInstalled: false, missingLinks, adoptVendor: vendorType === 'directory' }
 }
 
-function applyFreshInstall(repositoryRoot, paths, snapshot, preflight) {
+function applyFreshInstall(root, paths, snapshot, preflight) {
   const createdDirectories = []
   const createdLinks = []
   let stagedPlugin = null
@@ -465,7 +569,7 @@ function applyFreshInstall(repositoryRoot, paths, snapshot, preflight) {
     }
 
     for (const link of preflight.missingLinks) {
-      const path = resolve(repositoryRoot, link.path)
+      const path = resolve(root, link.path)
       assert(pathType(path) === 'missing', `${link.path} changed after preflight`)
       symlinkSync(link.target, path, 'dir')
       createdLinks.push(link)
@@ -473,11 +577,11 @@ function applyFreshInstall(repositoryRoot, paths, snapshot, preflight) {
 
     atomicWriteJson(paths.lock, preflight.desiredLock)
     lockCreated = true
-    verifyInstalledRepository(repositoryRoot, snapshot.codex.name, paths)
+    verifyInstallation(paths, snapshot.codex.name)
   } catch (error) {
     if (lockCreated) rmSync(paths.lock, { force: true })
     for (const link of [...createdLinks].reverse()) {
-      const path = resolve(repositoryRoot, link.path)
+      const path = resolve(root, link.path)
       if (pathType(path) === 'symlink' && readlinkSync(path) === link.target) unlinkSync(path)
     }
     if (vendorCreated) rmSync(paths.vendor, { recursive: true, force: true })
@@ -487,8 +591,8 @@ function applyFreshInstall(repositoryRoot, paths, snapshot, preflight) {
   }
 }
 
-function preflightUpdate(repositoryRoot, paths, snapshot) {
-  const installed = verifyInstalledRepository(repositoryRoot, snapshot.codex.name, paths)
+function preflightUpdate(root, paths, snapshot) {
+  const installed = verifyInstallation(paths, snapshot.codex.name)
   const desiredLock = lockForSnapshot(snapshot, paths)
   if (JSON.stringify(installed.lock) === JSON.stringify(desiredLock)) {
     return { installed, desiredLock, alreadyInstalled: true, staleLinks: [], newLinks: [] }
@@ -500,17 +604,17 @@ function preflightUpdate(repositoryRoot, paths, snapshot) {
   const addedLinks = desiredLock.managedSymlinks.filter((link) => !oldByPath.has(link.path))
   const newLinks = []
 
-  for (const link of staleLinks) assertExactSymlink(repositoryRoot, link, { mustResolve: true })
+  for (const link of staleLinks) assertExactSymlink(root, link, { mustResolve: true })
   for (const link of addedLinks) {
-    if (assertLinkAvailable(repositoryRoot, link) === 'missing') newLinks.push(link)
+    if (assertLinkAvailable(root, link) === 'missing') newLinks.push(link)
   }
   for (const link of desiredLock.managedSymlinks.filter((link) => oldByPath.has(link.path))) {
-    assertExactSymlink(repositoryRoot, link, { mustResolve: true })
+    assertExactSymlink(root, link, { mustResolve: true })
   }
   return { installed, desiredLock, alreadyInstalled: false, staleLinks, newLinks }
 }
 
-function applyUpdate(repositoryRoot, paths, snapshot, preflight) {
+function applyUpdate(root, paths, snapshot, preflight) {
   const token = randomUUID()
   const vendorBackup = resolve(paths.plugins, `.${snapshot.codex.name}.backup-${token}`)
   const lockBackup = `${paths.lock}.backup-${token}`
@@ -529,12 +633,12 @@ function applyUpdate(repositoryRoot, paths, snapshot, preflight) {
     stagedPlugin = null
 
     for (const link of preflight.staleLinks) {
-      assertExactSymlink(repositoryRoot, link)
-      unlinkSync(resolve(repositoryRoot, link.path))
+      assertExactSymlink(root, link)
+      unlinkSync(resolve(root, link.path))
       removedLinks.push(link)
     }
     for (const link of preflight.newLinks) {
-      const path = resolve(repositoryRoot, link.path)
+      const path = resolve(root, link.path)
       assert(pathType(path) === 'missing', `${link.path} changed after preflight`)
       symlinkSync(link.target, path, 'dir')
       createdLinks.push(link)
@@ -543,18 +647,18 @@ function applyUpdate(repositoryRoot, paths, snapshot, preflight) {
     renameSync(paths.lock, lockBackup)
     atomicWriteJson(paths.lock, preflight.desiredLock)
     lockSwapped = true
-    verifyInstalledRepository(repositoryRoot, snapshot.codex.name, paths)
+    verifyInstallation(paths, snapshot.codex.name)
     completed = true
   } catch (error) {
     if (completed) throw error
     if (lockSwapped) rmSync(paths.lock, { force: true })
     if (existsSync(lockBackup)) renameSync(lockBackup, paths.lock)
     for (const link of [...createdLinks].reverse()) {
-      const path = resolve(repositoryRoot, link.path)
+      const path = resolve(root, link.path)
       if (pathType(path) === 'symlink' && readlinkSync(path) === link.target) unlinkSync(path)
     }
     for (const link of removedLinks) {
-      const path = resolve(repositoryRoot, link.path)
+      const path = resolve(root, link.path)
       if (pathType(path) === 'missing') symlinkSync(link.target, path, 'dir')
     }
     if (vendorSwapped) {
@@ -569,7 +673,7 @@ function applyUpdate(repositoryRoot, paths, snapshot, preflight) {
   rmSync(lockBackup, { force: true })
 }
 
-function applyUninstall(repositoryRoot, paths, installed) {
+function applyUninstall(root, paths, installed) {
   const token = randomUUID()
   const vendorBackup = resolve(paths.plugins, `.${installed.lock.pluginId}.uninstall-${token}`)
   const lockBackup = `${paths.lock}.uninstall-${token}`
@@ -585,15 +689,15 @@ function applyUninstall(repositoryRoot, paths, installed) {
     lockMoved = true
 
     for (const link of installed.managedLinks) {
-      assertExactSymlink(repositoryRoot, link)
-      unlinkSync(resolve(repositoryRoot, link.path))
+      assertExactSymlink(root, link)
+      unlinkSync(resolve(root, link.path))
       removedLinks.push(link)
     }
     completed = true
   } catch (error) {
     if (completed) throw error
     for (const link of removedLinks) {
-      const path = resolve(repositoryRoot, link.path)
+      const path = resolve(root, link.path)
       if (pathType(path) === 'missing') symlinkSync(link.target, path, 'dir')
     }
     if (lockMoved && existsSync(lockBackup)) renameSync(lockBackup, paths.lock)
@@ -613,11 +717,14 @@ export function installRepository(options, dependencies = {}) {
   const apply = options.apply === true
   if (operation === 'check') assert(!apply, '--check is always read-only and cannot be combined with --apply')
 
-  const repositoryRoot = validateGitRoot(options.repositoryRoot ?? options.repo, 'Consumer repository')
-  const paths = repositoryPaths(repositoryRoot, pluginId, options.catalogRoot)
+  const paths = resolveInstallationPaths(options, pluginId, dependencies)
+  const { root } = paths
+  const global = paths.layout.type === 'global'
+  // Claude Code reads personal skills from CLAUDE_CONFIG_DIR when set; links elsewhere would be inert.
+  if (global && operation !== 'uninstall') assertDefaultClaudeConfig(paths, dependencies.env ?? process.env)
 
   if (operation === 'check') {
-    const installed = verifyInstalledRepository(repositoryRoot, pluginId, paths)
+    const installed = verifyInstallation(paths, pluginId)
     return {
       operation,
       applied: false,
@@ -627,13 +734,13 @@ export function installRepository(options, dependencies = {}) {
   }
 
   if (operation === 'uninstall') {
-    const installed = verifyInstalledRepository(repositoryRoot, pluginId, paths)
-    if (apply) applyUninstall(repositoryRoot, paths, installed)
+    const installed = verifyInstallation(paths, pluginId)
+    if (apply) applyUninstall(root, paths, installed)
     return {
       operation,
       applied: apply,
       message: apply
-        ? `Uninstalled ${pluginId} without removing repository skill directories`
+        ? `Uninstalled ${pluginId} without removing ${global ? 'personal' : 'repository'} skill directories`
         : `Uninstall preflight passed for ${pluginId}; rerun with --apply to remove managed content`,
       lock: installed.lock,
     }
@@ -651,8 +758,8 @@ export function installRepository(options, dependencies = {}) {
   })
   try {
     const preflight = operation === 'update'
-      ? preflightUpdate(repositoryRoot, paths, snapshot)
-      : preflightFreshInstall(repositoryRoot, paths, snapshot)
+      ? preflightUpdate(root, paths, snapshot)
+      : preflightFreshInstall(root, paths, snapshot)
 
     if (preflight.alreadyInstalled) {
       return {
@@ -666,13 +773,13 @@ export function installRepository(options, dependencies = {}) {
     const linksToCreate = operation === 'update' ? preflight.newLinks : preflight.missingLinks
     if (linksToCreate.length > 0) {
       const probe = dependencies.symlinkProbe ?? defaultSymlinkProbe
-      probe(repositoryRoot)
+      probe(root)
     }
 
     if (apply) {
-      validateRepositoryAnchors(paths)
-      if (operation === 'update') applyUpdate(repositoryRoot, paths, snapshot, preflight)
-      else applyFreshInstall(repositoryRoot, paths, snapshot, preflight)
+      validateAnchors(paths)
+      if (operation === 'update') applyUpdate(root, paths, snapshot, preflight)
+      else applyFreshInstall(root, paths, snapshot, preflight)
     }
 
     return {
@@ -692,7 +799,7 @@ export function parseArguments(argv) {
   const values = {}
   const switches = new Set()
   const valueFlags = new Set(['--repo', '--plugin', '--ref', '--source', '--catalog-root'])
-  const switchFlags = new Set(['--apply', '--check', '--update', '--uninstall', '--help'])
+  const switchFlags = new Set(['--apply', '--check', '--update', '--uninstall', '--global', '--help'])
 
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index]
@@ -711,7 +818,13 @@ export function parseArguments(argv) {
   }
 
   if (switches.has('--help')) return { help: true }
-  assert(values['--repo'], `--repo is required\n\n${usage}`)
+  const global = switches.has('--global')
+  if (global) {
+    assert(values['--repo'] === undefined && values['--catalog-root'] === undefined,
+      '--global cannot be combined with --repo or --catalog-root')
+  } else {
+    assert(values['--repo'], `--repo <root> or --global is required\n\n${usage}`)
+  }
   assert(values['--plugin'], `--plugin is required\n\n${usage}`)
   const operations = ['--check', '--update', '--uninstall'].filter((flag) => switches.has(flag))
   assert(operations.length <= 1, 'Choose only one of --check, --update, or --uninstall')
@@ -737,6 +850,7 @@ export function parseArguments(argv) {
     releaseTag: values['--ref'],
     source: values['--source'],
     catalogRoot: values['--catalog-root'],
+    global,
     operation,
     apply,
   }
@@ -755,7 +869,7 @@ function runCli() {
       console.log(`${result.lock.releaseTag} ${result.lock.commitSha} ${result.lock.contentDigest}`)
     }
   } catch (error) {
-    console.error(`agent-workflow repository installer: ${error.message}`)
+    console.error(`agent-workflow installer: ${error.message}`)
     process.exitCode = 1
   }
 }

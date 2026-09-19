@@ -18,7 +18,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { relative, resolve, sep } from 'node:path'
+import { dirname, relative, resolve, sep } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import test, { after, before } from 'node:test'
 import {
@@ -26,10 +26,13 @@ import {
   computeContentDigest,
   currentRelease,
   listSkillDirectories,
+  validateCatalog,
 } from '../lib/catalog-contract.mjs'
 import {
   defaultSymlinkProbe,
   installRepository,
+  parseArguments,
+  verifyGlobalInstallation,
   verifyInstalledRepository,
 } from '../install-repository.mjs'
 
@@ -44,8 +47,8 @@ let scratchRoot
 let baseCatalog
 let upgradeCatalog
 
-function run(command, args, cwd) {
-  const result = spawnSync(command, args, { cwd, encoding: 'utf8' })
+function run(command, args, cwd, env) {
+  const result = spawnSync(command, args, { cwd, encoding: 'utf8', ...(env ? { env } : {}) })
   assert.equal(result.status, 0, [result.stdout, result.stderr].filter(Boolean).join('\n'))
   return result.stdout.trim()
 }
@@ -74,10 +77,17 @@ function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`)
 }
 
+// Drop working-tree files that only the developer's global Git excludes ignore, so the fixture stays
+// clean when Git runs under a fake HOME.
+function removeIgnoredFiles(root) {
+  run('git', ['clean', '-fdXq'], root)
+}
+
 function makeBaseCatalog() {
   const root = resolve(scratchRoot, 'base-catalog')
   copyWorkingCatalog(root)
   initializeGitRepository(root, { tag: BASE_RELEASE_TAG })
+  removeIgnoredFiles(root)
   return root
 }
 
@@ -115,6 +125,7 @@ function makeUpgradeCatalog() {
   symlinkSync(`../../plugins/${PLUGIN_ID}/skills/future-skill`,
     resolve(root, '.agents', 'skills', 'future-skill'), 'dir')
   initializeGitRepository(root, { tag: UPGRADE_RELEASE_TAG })
+  removeIgnoredFiles(root)
   return root
 }
 
@@ -572,4 +583,256 @@ test('CLI catalog selection supports every operation without changing direct-ins
   assert.equal(verifyCatalog(consumer).lock.releaseTag, UPGRADE_RELEASE_TAG)
   run(process.execPath, [...args, '--uninstall', '--apply'], consumer)
   assert.equal(existsSync(resolve(consumer, '.agents')), false)
+})
+
+function globalUpdate(extra = {}) {
+  return { operation: 'update', releaseTag: UPGRADE_RELEASE_TAG, source: upgradeCatalog, ...extra }
+}
+
+function makeHome(label) {
+  const home = resolve(scratchRoot, `home-${label}-${Math.random().toString(16).slice(2)}`)
+  for (const skill of ['personal-only', 'synced/from-claude-ai']) {
+    const directory = resolve(home, '.claude', 'skills', skill)
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(resolve(directory, 'SKILL.md'),
+      `---\nname: ${skill.split('/').pop()}\ndescription: Fixture personal skill.\n---\n`)
+  }
+  return home
+}
+
+// Always target the fixture home; a global call without homeRoot would reach the real ~/.claude.
+function installGlobal(home, extra = {}, dependencies = {}) {
+  return installRepository({
+    global: true,
+    pluginId: PLUGIN_ID,
+    releaseTag: BASE_RELEASE_TAG,
+    source: baseCatalog,
+    operation: 'install',
+    apply: true,
+    ...extra,
+  }, { env: {}, ...dependencies, homeRoot: home })
+}
+
+function assertGlobalLink(home, name) {
+  const path = resolve(home, '.claude', 'skills', name)
+  assert.ok(lstatSync(path).isSymbolicLink(), `${name} must be a symlink`)
+  assert.equal(readlinkSync(path), `../../.agents/plugins/${PLUGIN_ID}/skills/${name}`)
+  assert.equal(realpathSync(path), realpathSync(resolve(home, '.agents', 'plugins', PLUGIN_ID, 'skills', name)))
+}
+
+function globalLockPath(home) {
+  return resolve(home, '.agents', 'plugins', `${PLUGIN_ID}.vendor.json`)
+}
+
+test('global installation links every skill into personal Claude skills beside unmanaged entries', () => {
+  const home = makeHome('global-clean')
+  const initial = treeSnapshot(home)
+  assert.equal(installGlobal(home).applied, true)
+  for (const name of BASE_SKILLS) assertGlobalLink(home, name)
+  assert.equal(existsSync(resolve(home, '.agents', 'skills')), false)
+  const installed = treeSnapshot(home)
+  for (const row of initial) assert.ok(installed.includes(row), row)
+
+  const verified = verifyGlobalInstallation(home)
+  assert.equal(verified.lock.schemaVersion, 2)
+  assert.deepEqual(verified.lock.layout, { type: 'global' })
+  assert.equal(verified.lock.managedSymlinks.length, BASE_SKILLS.length)
+  assert.ok(verified.lock.managedSymlinks.every((link) => link.path.startsWith('.claude/skills/')))
+
+  const moved = `${home}-moved`
+  renameSync(home, moved)
+  assert.doesNotThrow(() => verifyGlobalInstallation(moved))
+})
+
+test('global preflight writes nothing and an exact rerun changes nothing', () => {
+  const home = makeHome('global-idempotent')
+  const initial = treeSnapshot(home)
+  assert.equal(installGlobal(home, { apply: false }).applied, false)
+  assert.deepEqual(treeSnapshot(home), initial)
+  installGlobal(home)
+  const installed = treeSnapshot(home)
+  const lockBefore = readFileSync(globalLockPath(home), 'utf8')
+  assert.equal(installGlobal(home).applied, false)
+  assert.deepEqual(treeSnapshot(home), installed)
+  assert.equal(readFileSync(globalLockPath(home), 'utf8'), lockBefore)
+})
+
+test('a personal skill occupying a managed name blocks global installation without writes', async (t) => {
+  for (const kind of ['file', 'directory', 'wrong-symlink']) {
+    await t.test(kind, () => {
+      const home = makeHome(`global-collision-${kind}`)
+      const collision = resolve(home, '.claude', 'skills', 'codebase-design')
+      if (kind === 'file') writeFileSync(collision, 'personal content\n')
+      if (kind === 'directory') mkdirSync(collision)
+      if (kind === 'wrong-symlink') symlinkSync('../somewhere-else', collision, 'dir')
+      const beforeState = treeSnapshot(home)
+      assert.throws(() => installGlobal(home), /occupied by/)
+      assert.deepEqual(treeSnapshot(home), beforeState)
+      assert.equal(existsSync(resolve(home, '.agents')), false)
+    })
+  }
+})
+
+test('a symlinked global anchor is refused without writing through it', async (t) => {
+  for (const anchor of ['.claude', '.claude/skills', '.agents', '.agents/plugins']) {
+    await t.test(anchor, () => {
+      const home = makeHome(`global-anchor-${anchor.replace(/[./]/g, '-')}`)
+      const outside = resolve(scratchRoot, `outside-${Math.random().toString(16).slice(2)}`)
+      mkdirSync(outside)
+      const path = resolve(home, anchor)
+      rmSync(path, { recursive: true, force: true })
+      mkdirSync(dirname(path), { recursive: true })
+      symlinkSync(outside, path, 'dir')
+      const beforeHome = treeSnapshot(home)
+      assert.throws(() => installGlobal(home), /must be a real directory/)
+      assert.deepEqual(treeSnapshot(home), beforeHome)
+      assert.deepEqual(readdirSync(outside), [])
+    })
+  }
+})
+
+test('global installation requires an absolute home that already has a Claude user directory', () => {
+  for (const homeRoot of ['', 'relative/home']) {
+    assert.throws(() => installRepository({ global: true, pluginId: PLUGIN_ID, operation: 'check' },
+      { env: {}, homeRoot }), /absolute home directory/)
+  }
+  const home = resolve(scratchRoot, `home-without-claude-${Math.random().toString(16).slice(2)}`)
+  mkdirSync(home)
+  assert.throws(() => installGlobal(home), /existing Claude Code user directory/)
+  assert.deepEqual(readdirSync(home), [])
+})
+
+test('a relocated CLAUDE_CONFIG_DIR blocks global install, update, and check but not uninstall', () => {
+  const home = makeHome('global-config-dir')
+  const elsewhere = resolve(scratchRoot, `claude-config-${Math.random().toString(16).slice(2)}`)
+  mkdirSync(elsewhere)
+  const relocated = { env: { CLAUDE_CONFIG_DIR: elsewhere } }
+  const initial = treeSnapshot(home)
+  assert.throws(() => installGlobal(home, {}, relocated), /CLAUDE_CONFIG_DIR=/)
+  assert.deepEqual(treeSnapshot(home), initial)
+
+  installGlobal(home, {}, { env: { CLAUDE_CONFIG_DIR: resolve(home, '.claude') } })
+  assert.throws(() => installGlobal(home, { operation: 'check', apply: false }, relocated), /CLAUDE_CONFIG_DIR=/)
+  assert.throws(() => installGlobal(home, globalUpdate({ apply: false }), relocated), /CLAUDE_CONFIG_DIR=/)
+  assert.equal(installGlobal(home, { operation: 'uninstall' }, relocated).applied, true)
+})
+
+test('global update adds and removes managed links while preserving personal skills', () => {
+  const home = makeHome('global-update')
+  installGlobal(home)
+  const beforeUpdate = treeSnapshot(home)
+  assert.equal(installGlobal(home, globalUpdate({ apply: false })).applied, false)
+  assert.deepEqual(treeSnapshot(home), beforeUpdate)
+  assert.equal(installGlobal(home, globalUpdate()).applied, true)
+  assert.equal(existsSync(resolve(home, '.claude', 'skills', 'wait-what')), false)
+  assertGlobalLink(home, 'future-skill')
+  assert.ok(existsSync(resolve(home, '.claude', 'skills', 'personal-only', 'SKILL.md')))
+  assert.ok(existsSync(resolve(home, '.claude', 'skills', 'synced', 'from-claude-ai', 'SKILL.md')))
+  assert.equal(verifyGlobalInstallation(home).lock.releaseTag, UPGRADE_RELEASE_TAG)
+})
+
+test('global update refuses a hijacked managed link and preserves the home', () => {
+  const home = makeHome('global-hijack')
+  installGlobal(home)
+  const link = resolve(home, '.claude', 'skills', 'wait-what')
+  unlinkSync(link)
+  symlinkSync('../personal-target', link, 'dir')
+  const beforeState = treeSnapshot(home)
+  assert.throws(() => installGlobal(home, globalUpdate()), /points to .*expected/)
+  assert.deepEqual(treeSnapshot(home), beforeState)
+})
+
+test('global uninstall removes only the snapshot, lock, and managed links', () => {
+  const home = makeHome('global-uninstall')
+  const initial = treeSnapshot(home)
+  installGlobal(home)
+  const installed = treeSnapshot(home)
+  assert.equal(installGlobal(home, { operation: 'uninstall', apply: false }).applied, false)
+  assert.deepEqual(treeSnapshot(home), installed)
+  assert.equal(installGlobal(home, { operation: 'uninstall' }).applied, true)
+  assert.deepEqual(treeSnapshot(home), ['dir .agents', 'dir .agents/plugins', ...initial])
+})
+
+test('global and repository installations sharing a lock path refuse each other without writes', () => {
+  // A home directory can itself be a Git repository, where both layouts use .agents/plugins.
+  const globalHome = makeHome('global-git-home')
+  initializeGitRepository(globalHome)
+  installGlobal(globalHome)
+  const globalState = treeSnapshot(globalHome)
+  assert.throws(() => verifyInstalledRepository(globalHome), /layout does not match/)
+  assert.throws(() => installBase(globalHome), /layout does not match/)
+  assert.deepEqual(treeSnapshot(globalHome), globalState)
+
+  const repositoryHome = makeConsumer('direct-home')
+  installBase(repositoryHome)
+  const repositoryState = treeSnapshot(repositoryHome)
+  assert.throws(() => installGlobal(repositoryHome), /\.claude\/skills must be a real directory/)
+  assert.throws(() => verifyGlobalInstallation(repositoryHome), /\.claude\/skills must be a real directory/)
+  assert.deepEqual(treeSnapshot(repositoryHome), repositoryState)
+})
+
+test('a global lock rejects a foreign layout or a link outside personal skills', () => {
+  for (const [corruption, expected] of [['layout', /layout does not match/], ['link', /Unsafe managed symlink/]]) {
+    const home = makeHome(`global-lock-${corruption}`)
+    installGlobal(home)
+    const lock = JSON.parse(readFileSync(globalLockPath(home), 'utf8'))
+    if (corruption === 'layout') lock.layout.root = 'somewhere'
+    else lock.managedSymlinks[0].path = '.agents/skills/codebase-design'
+    writeJson(globalLockPath(home), lock)
+    const beforeState = treeSnapshot(home)
+    assert.throws(() => verifyGlobalInstallation(home), expected)
+    assert.throws(() => installGlobal(home, { operation: 'uninstall' }), expected)
+    assert.deepEqual(treeSnapshot(home), beforeState)
+  }
+})
+
+test('--global excludes repository selection in the CLI parser and the API', () => {
+  const check = ['--plugin', PLUGIN_ID, '--check']
+  assert.throws(() => parseArguments([...check, '--global', '--repo', '.']), /cannot be combined/)
+  assert.throws(() => parseArguments([...check, '--global', '--catalog-root', RESOURCE_ROOT]), /cannot be combined/)
+  assert.throws(() => parseArguments(check), /--repo <root> or --global is required/)
+  assert.equal(parseArguments([...check, '--global']).global, true)
+
+  const home = makeHome('global-api')
+  for (const extra of [{ repositoryRoot: catalogWorkingTree }, { catalogRoot: RESOURCE_ROOT }]) {
+    assert.throws(() => installRepository({ global: true, pluginId: PLUGIN_ID, operation: 'check', ...extra },
+      { env: {}, homeRoot: home }), /cannot be combined/)
+  }
+  assert.throws(() => installRepository({ pluginId: PLUGIN_ID, operation: 'check' }),
+    /--repo <root> or --global is required/)
+})
+
+test('CLI --global supports every operation against the HOME directory', () => {
+  const home = makeHome('global-cli')
+  const env = { ...process.env, HOME: home, USERPROFILE: home }
+  delete env.CLAUDE_CONFIG_DIR
+  const cli = resolve(catalogWorkingTree, 'scripts', 'install-repository.mjs')
+  const args = [cli, '--global', '--plugin', PLUGIN_ID]
+  const initial = treeSnapshot(home)
+  run(process.execPath, [...args, '--source', baseCatalog, '--ref', BASE_RELEASE_TAG], home, env)
+  assert.deepEqual(treeSnapshot(home), initial)
+  run(process.execPath, [...args, '--source', baseCatalog, '--ref', BASE_RELEASE_TAG, '--apply'], home, env)
+  run(process.execPath, [...args, '--check'], home, env)
+  run(process.execPath, [...args, '--source', upgradeCatalog, '--ref', UPGRADE_RELEASE_TAG, '--update', '--apply'],
+    home, env)
+  assert.equal(verifyGlobalInstallation(home).lock.releaseTag, UPGRADE_RELEASE_TAG)
+  run(process.execPath, [...args, '--uninstall', '--apply'], home, env)
+  assert.deepEqual(treeSnapshot(home), ['dir .agents', 'dir .agents/plugins', ...initial])
+})
+
+test('the running installer still validates older catalogs whose Claude marketplace carries Codex metadata', () => {
+  const legacy = resolve(scratchRoot, 'legacy-marketplace-catalog')
+  copyWorkingCatalog(legacy)
+  const claudePath = resolve(legacy, '.claude-plugin', 'marketplace.json')
+  const claude = JSON.parse(readFileSync(claudePath, 'utf8'))
+  claude.interface = { displayName: 'Agent Workflow Plugins' }
+  claude.plugins[0].policy = { installation: 'AVAILABLE', authentication: 'ON_INSTALL' }
+  writeJson(claudePath, claude)
+  assert.doesNotThrow(() => validateCatalog(legacy))
+
+  const codexPath = resolve(legacy, '.agents', 'plugins', 'marketplace.json')
+  const codex = JSON.parse(readFileSync(codexPath, 'utf8'))
+  delete codex.interface
+  writeJson(codexPath, codex)
+  assert.throws(() => validateCatalog(legacy), /Codex marketplace display name/)
 })

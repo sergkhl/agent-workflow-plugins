@@ -131,6 +131,28 @@ test('portable skill content contains no application, machine, or secret identif
   }
 })
 
+test('Claude manifests carry only fields Claude Code recognizes, so strict validation passes', () => {
+  // Deliberately narrower than Claude Code's schema: a new field is a conscious contract change.
+  const marketplacePath = '.claude-plugin/marketplace.json'
+  const pluginPath = `plugins/${PLUGIN_ID}/.claude-plugin/plugin.json`
+  const marketplace = JSON.parse(readFileSync(resolve(repositoryRoot, marketplacePath), 'utf8'))
+  const plugin = JSON.parse(readFileSync(resolve(repositoryRoot, pluginPath), 'utf8'))
+  const levels = [
+    [marketplacePath, 'top-level', marketplace, ['description', 'name', 'owner', 'plugins']],
+    [marketplacePath, 'owner', marketplace.owner, ['name', 'url']],
+    ...marketplace.plugins.map((entry) => [marketplacePath, 'plugin entry', entry,
+      ['category', 'description', 'keywords', 'name', 'source']]),
+    [pluginPath, 'top-level', plugin,
+      ['author', 'description', 'homepage', 'keywords', 'license', 'name', 'repository', 'skills', 'version']],
+  ]
+  for (const [path, level, object, allowed] of levels) {
+    for (const key of Object.keys(object)) {
+      assert.ok(allowed.includes(key),
+        `${path} ${level} field "${key}" is outside the Claude allowlist; keep Codex-only metadata in the Codex manifests`)
+    }
+  }
+})
+
 test('the plugin carries its own MIT license and complete upstream notice', () => {
   const license = readFileSync(resolve(pluginRoot, 'LICENSE'), 'utf8')
   const notices = readFileSync(resolve(pluginRoot, 'THIRD_PARTY_NOTICES.md'), 'utf8')

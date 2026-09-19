@@ -1,7 +1,7 @@
 # agent-workflow-core
 
-A plan-driven workflow for coding agents, packaged for repository-scoped or marketplace
-installation.
+A plan-driven workflow for coding agents, packaged for repository-scoped, personal Claude Code, or
+marketplace installation.
 
 The skills support research, design interviews, recorded plans, ordered execution, and
 documentation maintenance. Use the entrypoint that matches the requested work.
@@ -23,8 +23,8 @@ documentation maintenance. Use the entrypoint that matches the requested work.
 | `improve-codebase-architecture` | explicit | Finds deepening opportunities, reports them, then grills the selected one. |
 | `wait-what` | explicit | Re-pitches an explanation that did not land. |
 
-All twelve skills share this `skills/` source tree. Repository installs expose them through
-relative links.
+All twelve skills share this `skills/` source tree. Repository and global installs expose them
+through relative links.
 
 ## Invocation policy
 
@@ -73,8 +73,9 @@ directories, whether directly installed or exposed through a setup-owned catalog
 
 Use the catalog's
 [repository installer](https://github.com/sergkhl/agent-workflow-plugins/blob/main/scripts/install-repository.mjs) for a pinned team-repository
-installation, or follow the catalog [README](https://github.com/sergkhl/agent-workflow-plugins) for a personal marketplace install.
-Do not enable both copies in the same working context.
+installation or, with `--global`, for pinned personal Claude Code skills. The catalog
+[README](https://github.com/sergkhl/agent-workflow-plugins) also covers marketplace installs.
+Do not enable two copies in the same working context.
 
 Repository installation is an explicit operation managed by the installer.
 
