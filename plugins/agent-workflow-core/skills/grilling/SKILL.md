@@ -5,30 +5,48 @@ description: Stress-test a plan, decision, or idea through an interview when the
 
 # Grilling
 
-Reach a shared understanding of the decisions that materially affect the user's idea. Inspect
-available facts yourself; ask the user about intent and tradeoffs that evidence cannot settle.
+Interview the user until you reach a shared understanding. Map the idea as a design tree: every
+decision branches into the decisions that hang off it. Facts are yours to find: inspect the code,
+history, and documents, and never ask the user for anything you could look up. Decisions are the
+user's: put each one to them and wait. A requirement or evidence that admits more than one
+reasonable reading is a decision, not a detail to settle with the reading you prefer.
 
-Finish the current round's relevant fact-finding and explanation before presenting its questions.
-Ask the independent questions whose prerequisites are settled in one manageable batch, with a
-recommended answer and its tradeoff for each. Use concrete scenarios to expose ambiguity rather
-than visiting every hypothetical branch.
+Work the tree in rounds. The frontier is every decision whose prerequisites are already settled:
+the questions you can ask now without guessing at answers you have not heard. Ask the whole
+frontier in one round, however large; number each question and give your recommended answer. A
+question whose answer depends on another question still open in this round belongs to a later
+round. Use concrete scenarios (an empty input, a failure midway, a second actor, an existing
+record) to find the branches you would otherwise fill in yourself. Then wait for the answers.
 
-Make the questions the round's final handoff. Use the host's question cards when available in the
-current mode. With an asynchronous question tool, make it the last tool call, then include every
-full question, its recommendation, and the tradeoff in a numbered list in the final reply and yield.
-A tool's acceptance receipt does not establish that the user can see its cards. The reply itself
-must be enough to answer; never substitute a note that questions are pending. Do not bury the batch
-under further research, progress updates, or another batch while answers are pending. A blocking
-question tool already supplies the handoff; continue when it returns the answers.
+Format a round like so:
 
-After answers arrive, retain confirmed choices and adapt the next round to what changed. Re-ask
-only unresolved questions, with their recommendations, at the next handoff. If cards are unavailable
-or the user reports not seeing them, use the numbered list directly instead of sending another card.
-An unanswered or preselected recommendation is not a user decision.
+```
+❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
 
-Resolve routine details from the user's stated constraints. Use independent investigations only
-when useful and delegation is permitted; lookups do not require a subagent.
+➡️ <your recommended answer>
 
-Finish when the intended outcome, material constraints, and consequential decisions are clear.
-Summarize unresolved issues honestly. An interview alone does not authorize implementation; an
-existing implementation request remains authoritative without another ceremonial confirmation.
+---
+
+❓ **Q2** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+
+➡️ <your recommended answer>
+```
+
+The round is the reply's final handoff: finish the round's fact-finding and explanation first, put
+the list at the end, and yield. Present it in the reply rather than through a question tool: a
+tool's per-call limit would cap the round, and the reply is what the user can always see. Do not
+bury the list under further research, progress updates, or a second round while answers are
+pending. A lookup still in progress is an unsettled prerequisite: hold back only the questions
+downstream of it and ask the rest of the frontier now. Delegate a lookup only when the host permits
+delegation; lookups do not require a subagent.
+
+Each round of answers reshapes the tree: settled decisions push the frontier outward and unblock
+the questions that depended on them. Retain confirmed choices, recompute the frontier, and ask the
+next round, re-asking an unresolved question with its recommendation. An unanswered question or an
+unaccepted recommendation is not a user decision, and silence is not delegation.
+
+The interview is done when the frontier is empty: every branch of the design tree visited and
+nothing left silently assumed. A tree with no open decision is done at once; say what the evidence
+settled. Summarize unresolved issues honestly. An interview alone does not authorize
+implementation; an existing implementation request remains authoritative without another
+ceremonial confirmation.

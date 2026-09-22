@@ -12,11 +12,11 @@ documentation maintenance. Use the entrypoint that matches the requested work.
 |---|---|---|
 | `research` | model | Investigates primary sources and saves concise, cited findings using repository conventions. |
 | `plan-lifecycle` | model | Applies the adopted index, `TODO`/`RELEASE`, task-owned actions, closure rules, and evidence retention. |
-| `plan-from-tasks` | explicit | Turns a task list into a new plan after answering what it can from the repository and grilling the remaining decisions. |
+| `plan-from-tasks` | explicit | Turns a task list into a new plan after answering what it can from the repository and grilling every remaining decision with the user, round by round. |
 | `drain-plans` | explicit | Repeats batch, validation, status persistence, commit, and re-read until nothing is actionable. |
 | `docs-hygiene` | explicit | Consolidates canonical documentation; retires eligible delivered work and proposes holds for inactive tasks. |
 | `worklog` | explicit | Estimates hands-on effort per day from commit authorship and emits a CSV. |
-| `grilling` | model | Interviews the user to settle consequential decisions and constraints. |
+| `grilling` | model | Interviews the user in rounds until every branch of the design tree is settled. |
 | `grill-with-docs` | explicit | Combines `grilling` with `domain-modeling` so ADRs and glossary entries result from the interview. |
 | `domain-modeling` | model | Builds and sharpens a project's ubiquitous language and ADR record. |
 | `codebase-design` | model | Supplies vocabulary for deep modules, interfaces, seams, and testability. |
