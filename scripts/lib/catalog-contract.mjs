@@ -359,6 +359,33 @@ export const RELEASE_INVENTORY = {
       'worklog',
     ],
   },
+  // 0.8.1 restores the design-tree grilling loop and runs it on every plan; the skill inventory
+  // and invocation gates are unchanged.
+  '0.8.1': {
+    skills: [
+      'codebase-design',
+      'docs-hygiene',
+      'domain-modeling',
+      'drain-plans',
+      'grill-with-docs',
+      'grilling',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'plan-lifecycle',
+      'research',
+      'wait-what',
+      'worklog',
+    ],
+    explicitOnly: [
+      'docs-hygiene',
+      'drain-plans',
+      'grill-with-docs',
+      'improve-codebase-architecture',
+      'plan-from-tasks',
+      'wait-what',
+      'worklog',
+    ],
+  },
 }
 
 export function readJson(path) {

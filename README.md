@@ -16,13 +16,13 @@ checks in repository-scoped skill links for both Codex and Claude:
 .claude/skills -> ../.agents/skills        one shared Claude entry point
 ```
 
-Install release `0.8.0` from the public tag:
+Install release `0.8.1` from the public tag:
 
 ```bash
 node scripts/install-repository.mjs \
   --repo <consumer-repository-root> \
   --plugin agent-workflow-core \
-  --ref agent-workflow-core--v0.8.0 \
+  --ref agent-workflow-core--v0.8.1 \
   --apply
 ```
 
@@ -32,7 +32,7 @@ When developing the catalog locally, replace the network fetch with a clean, tag
 node scripts/install-repository.mjs \
   --repo <consumer-repository-root> \
   --plugin agent-workflow-core \
-  --ref agent-workflow-core--v0.8.0 \
+  --ref agent-workflow-core--v0.8.1 \
   --source . \
   --apply
 ```
@@ -72,7 +72,7 @@ to every installer operation. For example:
 
 ```bash
 node scripts/install-repository.mjs --repo <root> --plugin agent-workflow-core \
-  --catalog-root dev-setup/catalog --ref agent-workflow-core--v0.8.0 --update --apply
+  --catalog-root dev-setup/catalog --ref agent-workflow-core--v0.8.1 --update --apply
 ```
 
 This manages the selected plugin snapshot and lock under `<catalog-root>/plugins/`, and its portable links under
@@ -103,7 +103,7 @@ Replace `--repo` with `--global`; every other option and operation works as in r
 
 ```bash
 node scripts/install-repository.mjs --global --plugin agent-workflow-core \
-  --ref agent-workflow-core--v0.8.0 --apply
+  --ref agent-workflow-core--v0.8.1 --apply
 
 node scripts/install-repository.mjs --global --plugin agent-workflow-core --check
 
@@ -178,8 +178,8 @@ working tree.
 - Marketplace ID: `agent-workflow`
 - Marketplace display name (Codex): `Agent Workflow Plugins`
 - Plugin ID: `agent-workflow-core`
-- Current version: `0.8.0`
-- Release tag: `agent-workflow-core--v0.8.0`
+- Current version: `0.8.1`
+- Release tag: `agent-workflow-core--v0.8.1`
 - Plugin path: `./plugins/agent-workflow-core`
 - Installation policy (Codex): `AVAILABLE`
 - Authentication policy (Codex): `ON_INSTALL`
