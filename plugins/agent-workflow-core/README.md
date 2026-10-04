@@ -51,6 +51,14 @@ A gated skill's default prompt names the skill explicitly. Named invocations per
 active task; documented helpers may be consulted within that scope. A repository reference alone
 does not authorize unrelated work or additional external actions.
 
+## Delegation
+
+The skills encourage subagents when independent work could save time or improve quality, using the
+shared [delegation guidance](references/delegation.md). Subagents may delegate further under the
+same scope and host limits. The coordinating agent integrates results and completes the task.
+`drain-plans` permits parallel work within the active batch while plans and batches advance in index
+order; the coordinator owns combined validation, lifecycle updates, and commits.
+
 ## Host repository assumptions
 
 Planning and domain workflows use the repository's adopted files:
@@ -93,4 +101,5 @@ and useful routing in the entrypoint; load detailed procedures only for the rele
 Preserve named opt-in gates, user intent, meaningful completion criteria, and operational
 boundaries. Prefer scoped evidence over mandatory reading itineraries or repeated passing tests.
 These conventions follow [OpenAI's skills and prompts guidance](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)
+and [subagent guidance](https://developers.openai.com/api/docs/guides/latest-model?model=gpt-6-astra#subagent-delegation),
 and remain useful across models. Validate metadata, references, and realistic task decisions.

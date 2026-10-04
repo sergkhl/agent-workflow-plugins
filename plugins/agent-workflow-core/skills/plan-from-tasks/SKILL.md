@@ -25,6 +25,10 @@ ADRs for constraints, and `docs/plans/README.md` for placement or overlap with e
 individual plans only when they affect this task. Production, device, and destructive
 investigations still need their own authority.
 
+Delegate independent code, dependency, or evidence investigations under the
+[delegation guidance](../../references/delegation.md). The coordinating agent synthesizes the design
+and owns the final plan and registration.
+
 ## Grill the design
 
 Run the [grilling](../grilling/SKILL.md) frontier loop on every invocation: map the design tree,

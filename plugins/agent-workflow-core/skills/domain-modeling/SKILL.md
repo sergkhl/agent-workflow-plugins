@@ -9,6 +9,10 @@ Apply when the task involves defining domain terms or settling durable design ch
 the relevant glossary, code, and concrete scenarios. Resolve routine ambiguity from the available
 evidence; ask the user when an unresolved meaning or conflict materially affects the design.
 
+Use [delegation](../../references/delegation.md) for independent context or scenario investigations.
+The coordinating agent reconciles terminology across contexts and owns the final glossary and ADR
+synthesis, including shared numbering.
+
 Use the repository's established vocabulary and record settled meanings in the owning context.
 `CONTEXT.md` owns domain vocabulary; ADRs own consequential implementation decisions and reasoning.
 Create files lazily when a resolved term or qualifying decision needs a recorded home.

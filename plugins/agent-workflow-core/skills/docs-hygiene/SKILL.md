@@ -24,6 +24,10 @@ first, then consolidate or delete it in a later commit so the original remains r
 Start with the requested documents and their actual consumers. Follow links to the relevant
 glossary, ADRs, plans, or runbooks when ownership or consistency depends on them.
 
+Use [delegation](../../references/delegation.md) for independent audits of document areas. The
+coordinating agent reconciles overlaps and ownership conflicts before consolidation and owns the
+preservation and deletion commits.
+
 When the requested set includes planning or release coordination, apply the repository's explicit
 policy or the [lifecycle defaults](../plan-lifecycle/references/conventions.md#manual-hygiene-and-age).
 Close eligible delivered work in this pass and propose holds for inactive unfinished tasks. This

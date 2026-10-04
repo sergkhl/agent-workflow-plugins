@@ -35,7 +35,13 @@ or the plan-less task, including owner-required actions, and move to the next ac
 Use a separate blocker file only when the repository explicitly retains that convention.
 
 Size each batch by complexity and coupling. Read the current plan and its relevant dependencies.
-Implementation units are sequential and exclusive.
+Plans and batches advance sequentially in index order. Within the active batch, delegate independent
+implementation, investigation, or review when it could save time or improve quality, following the
+[delegation guidance](../../references/delegation.md).
+
+Give concurrent edits distinct ownership. The coordinating agent integrates changes, validates the
+combined result, persists lifecycle status, and commits the batch before advancing to the next one.
+Finish or stop outstanding delegated work before moving on, including when the batch becomes blocked.
 
 ## Resuming
 

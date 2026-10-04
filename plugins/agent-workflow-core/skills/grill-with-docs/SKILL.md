@@ -14,3 +14,6 @@ Use [grilling](../grilling/SKILL.md) for the interview and
 [domain-modeling](../domain-modeling/SKILL.md) for resolved terms and consequential decisions.
 These helpers are part of this invocation's scope. Record only decisions the conversation settles;
 follow the host's mode restrictions and stop at the requested design/documentation outcome.
+
+Use the [delegation guidance](../../references/delegation.md) for independent evidence gathering
+within this design scope; keep the interview and shared decision records with the coordinating agent.

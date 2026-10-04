@@ -66,6 +66,11 @@ location only when it is ignored; do not change repository ignore rules to save 
   the previous day. This changes workday attribution, not the default end date of today.
 - Report days with no commits as `0`. Do not spread work into them.
 
+Use [delegation](../../references/delegation.md) for independent history or diff analysis after
+resolving the inputs. Give every subagent the same author, timezone, date range, and workday boundary.
+The coordinating agent deduplicates patches across all findings and computes the combined daily
+spans and effort; do not sum separate estimates or count agent runtime as the person's effort.
+
 ## Estimating the number
 
 Compute each day's first→last commit span **first**. Hands-on hours must not exceed that span, and

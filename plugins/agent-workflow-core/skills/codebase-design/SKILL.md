@@ -9,6 +9,9 @@ Use for module design and architectural refactoring, or as a documented helper f
 Keep the user's scope and the project's domain vocabulary. Prefer a small interface that hides
 meaningful complexity and concentrates changes and tests.
 
+Delegate independent design investigations or alternative interfaces when useful, following the
+[delegation guidance](../../references/delegation.md). Compare results against the same constraints.
+
 - For terminology and design criteria, consult [design principles](references/design-principles.md).
 - For a coupled cluster and its dependencies, consult [DEEPENING.md](DEEPENING.md).
 - For requested alternative interfaces, consult [DESIGN-IT-TWICE.md](DESIGN-IT-TWICE.md).

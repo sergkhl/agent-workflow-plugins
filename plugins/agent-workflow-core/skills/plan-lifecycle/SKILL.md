@@ -9,6 +9,10 @@ Use these conventions for the current task's plan creation, registration, progre
 closure in a repository that has adopted this workflow. Reading a plan alone does not trigger a
 maintenance sweep. Keep lifecycle actions within the user's scope and the host's mode.
 
+Use [delegation](../../references/delegation.md) for independent evidence checks. The coordinating
+agent integrates their findings and owns lifecycle record updates and commits, preserving the
+ordered transitions and validation requirements of the active workflow.
+
 Use the relevant sections of [conventions](references/conventions.md):
 
 - Creating or registering work: coordination files, plan-less work, and status ownership.

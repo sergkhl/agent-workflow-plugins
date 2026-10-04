@@ -12,5 +12,6 @@ Write the findings as one concise Markdown document, citing the source for each 
 Use the repository's research or artifact conventions; update an existing document when it already
 owns the findings. If no convention exists, choose a sensible location and report it.
 
-Delegate a bounded investigation when it can run independently alongside useful work and the host
-supports and permits delegation. Otherwise research directly.
+Delegate independent source investigations when it could save time or improve quality, following
+the [delegation guidance](../../references/delegation.md). Reconcile their findings and supporting
+sources into the final document.

@@ -11,6 +11,10 @@ history, and documents, and never ask the user for anything you could look up. D
 user's: put each one to them and wait. A requirement or evidence that admits more than one
 reasonable reading is a decision, not a detail to settle with the reading you prefer.
 
+Delegate independent fact-finding when it could save time or improve quality, following the
+[delegation guidance](../../references/delegation.md). Keep the design tree and user interview with
+the coordinating agent.
+
 Work the tree in rounds. The frontier is every decision whose prerequisites are already settled:
 the questions you can ask now without guessing at answers you have not heard. Ask the whole
 frontier in one round, however large; number each question and give your recommended answer. A
@@ -37,8 +41,7 @@ the list at the end, and yield. Present it in the reply rather than through a qu
 tool's per-call limit would cap the round, and the reply is what the user can always see. Do not
 bury the list under further research, progress updates, or a second round while answers are
 pending. A lookup still in progress is an unsettled prerequisite: hold back only the questions
-downstream of it and ask the rest of the frontier now. Delegate a lookup only when the host permits
-delegation; lookups do not require a subagent.
+downstream of it and ask the rest of the frontier now.
 
 Each round of answers reshapes the tree: settled decisions push the frontier outward and unblock
 the questions that depended on them. Retain confirmed choices, recompute the frontier, and ask the

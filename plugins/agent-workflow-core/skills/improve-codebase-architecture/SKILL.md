@@ -20,8 +20,9 @@ architectural vocabulary should clarify the proposal, not ban familiar words.
 
 Look for complexity spread across callers, interfaces that expose implementation choices, and
 changes or tests that require crossing too many files. Test whether removing a suspected wrapper
-actually removes complexity or merely pushes it to callers. Delegate a bounded independent lookup
-only when useful and permitted.
+actually removes complexity or merely pushes it to callers. Delegate independent candidate
+investigations when it could save time or improve quality, following the
+[delegation guidance](../../references/delegation.md), then compare their evidence in one report.
 
 ## Present the report
 
